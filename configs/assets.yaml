@@ -1,0 +1,12 @@
+assets:
+  offensive:
+    - QQQ
+    - SPY
+    - XLK
+    - SMH
+  defensive:
+    - SHY
+    - GLD
+  benchmark:
+    - QQQ
+    - SPY

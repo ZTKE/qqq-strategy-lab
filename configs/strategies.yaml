@@ -1,0 +1,99 @@
+qqq_buy_hold:
+  type: buy_and_hold
+  weights:
+    QQQ: 1.0
+
+qqq_80_spy_20:
+  type: static_allocation
+  weights:
+    QQQ: 0.8
+    SPY: 0.2
+
+qqq_70_spy_20_shy_10:
+  type: static_allocation
+  weights:
+    QQQ: 0.7
+    SPY: 0.2
+    SHY: 0.1
+
+trend_200dma:
+  type: trend_200dma
+  signal_asset: QQQ
+  ma_window: 200
+  risk_on:
+    QQQ: 0.8
+    SPY: 0.2
+  risk_off:
+    QQQ: 0.3
+    SPY: 0.2
+    SHY: 0.5
+
+core_trend:
+  type: core_trend
+  signal_asset: QQQ
+  ma_window: 200
+  core_asset: QQQ
+  core_weight: 0.6
+  risk_on_asset: QQQ
+  risk_off_asset: SHY
+  tactical_weight: 0.4
+
+drawdown_buy:
+  type: drawdown_buy
+  signal_asset: QQQ
+  rules:
+    - drawdown_lt: 0.10
+      weights:
+        QQQ: 0.7
+        SPY: 0.2
+        SHY: 0.1
+    - drawdown_lt: 0.20
+      weights:
+        QQQ: 0.8
+        SPY: 0.15
+        SHY: 0.05
+    - drawdown_lt: 0.30
+      weights:
+        QQQ: 0.9
+        SPY: 0.1
+    - drawdown_lt: 1.00
+      weights:
+        QQQ: 1.0
+
+momentum_rotation:
+  type: momentum_rotation
+  assets:
+    - QQQ
+    - SPY
+    - XLK
+    - SMH
+    - GLD
+    - SHY
+  lookback_months: 6
+  top_n: 2
+  ma_window: 200
+  fallback_asset: SHY
+
+dca_drawdown_boost:
+  type: dca
+  initial_capital: 20000
+  monthly_contribution: 3000
+  signal_asset: QQQ
+  normal_weights:
+    QQQ: 0.7
+    SPY: 0.2
+    SHY: 0.1
+  rules:
+    - drawdown_gte: 0.10
+      contribution_multiplier: 1.0
+      weights:
+        QQQ: 0.9
+        SPY: 0.1
+    - drawdown_gte: 0.20
+      contribution_multiplier: 1.0
+      weights:
+        QQQ: 1.0
+    - drawdown_gte: 0.30
+      contribution_multiplier: 1.0
+      weights:
+        QQQ: 1.0
