@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
-from src.calendar_utils import monthly_last_trading_days, rebalance_signal_dates
+from src.calendar_utils import daily_signal_dates, monthly_last_trading_days, rebalance_signal_dates
 from src.metrics import performance_summary
 from src.strategies.base import Strategy
 
@@ -45,7 +45,13 @@ class BacktestEngine:
         index = self.prices.index
         monthly_dates = set(monthly_last_trading_days(index))
         first_date = index[0]
-        signal_dates = rebalance_signal_dates(index, include_first=True)
+        frequency = str(strategy.config.get("rebalance_frequency", "monthly")).lower()
+        if frequency == "daily":
+            signal_dates = daily_signal_dates(index, include_first=True)
+        elif frequency == "monthly":
+            signal_dates = rebalance_signal_dates(index, include_first=True)
+        else:
+            raise ValueError(f"Unsupported rebalance_frequency for {strategy.name}: {frequency}")
         scheduled_weights = {
             date: self._validate_weights(strategy.generate_weights(self.prices, date))
             for date in signal_dates

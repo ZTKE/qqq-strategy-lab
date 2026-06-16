@@ -317,6 +317,26 @@ def _strategy_method_text(config: dict) -> str:
             f"正常按 {_format_weights(config.get('normal_weights', {}))} 买入，"
             f"并根据 `{signal_asset}` 回撤调整买入权重：{_format_dca_rules(config.get('rules', []))}。"
         )
+    if strategy_type == "daily_trend_2x":
+        return "每日检查 QQQ 是否高于 200 日均线；牛市持有合成 2x QQQ，熊市切到 SHY/现金。"
+    if strategy_type == "daily_trend_3x_defensive":
+        return "每日检查 QQQ 的 50/200 日均线；强趋势用合成 3x QQQ，普通牛市用 2x，弱势切防守资产。"
+    if strategy_type == "dual_ma_leverage_ladder":
+        return "每日用 20/50/200 日均线做阶梯判断；趋势越强杠杆越高，最高合成 3x，跌破长期趋势切 SHY。"
+    if strategy_type == "vol_target_trend":
+        return "每日先做 200 日趋势过滤；趋势开启后按近 20 日年化波动率调杠杆，低波动用 3x，中波动用 2x，高波动降到 1x。"
+    if strategy_type == "core_trend_2x":
+        return "每日保留 QQQ 核心仓，战术仓根据 50/200 日趋势切换 3x、2x 或 SHY，避免全仓裸杠杆。"
+    if strategy_type == "momentum_rotation_2x":
+        return "每日在 QQQ/SPY/XLK/SMH/GLD/SHY 中做 200 日趋势过滤和 6 个月动量排名；进攻资产用合成 2x，防守资产不用杠杆。"
+    if strategy_type == "breakout_3x_with_stop":
+        return "每日寻找接近 252 日新高的强趋势突破；接近新高且趋势强时用 3x，趋势变弱逐级降到 2x、1x 或 SHY。"
+    if strategy_type == "crash_protected_tqqq":
+        return "每日检查 QQQ 是否高于 200 日均线且 200 日均线向上；满足时用合成 3x QQQ，否则降到 1x 或 SHY。"
+    if strategy_type == "adaptive_leverage_score":
+        return "每日用趋势、均线结构、6 个月动量、回撤和波动率打分；高分用 3x，中高分用 2x，中等用 1x，低分切 SHY。"
+    if strategy_type == "dca_leverage_boost":
+        return "只调整每月新增资金：强牛市新增资金买合成 3x，普通牛市买 2x，熊市转为 QQQ/SHY 防守组合。"
     return "使用配置文件中定义的策略类型和参数生成月度目标权重。"
 
 

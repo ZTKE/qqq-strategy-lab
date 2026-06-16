@@ -97,3 +97,139 @@ dca_drawdown_boost:
       contribution_multiplier: 1.0
       weights:
         QQQ: 1.0
+
+daily_trend_2x:
+  type: daily_trend_2x
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  ma_window: 200
+  risk_on_asset: QQQ_2X
+  risk_off_asset: SHY
+
+daily_trend_3x_defensive:
+  type: daily_trend_3x_defensive
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  fast_window: 50
+  slow_window: 200
+  asset_1x: QQQ
+  asset_2x: QQQ_2X
+  asset_3x: QQQ_3X
+  risk_off_asset: SHY
+
+dual_ma_leverage_ladder:
+  type: dual_ma_leverage_ladder
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  short_window: 20
+  mid_window: 50
+  long_window: 200
+  asset_1x: QQQ
+  asset_2x: QQQ_2X
+  asset_3x: QQQ_3X
+  risk_off_asset: SHY
+
+vol_target_trend:
+  type: vol_target_trend
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  ma_window: 200
+  vol_window: 20
+  low_vol_threshold: 0.18
+  high_vol_threshold: 0.28
+  asset_1x: QQQ
+  asset_2x: QQQ_2X
+  asset_3x: QQQ_3X
+  risk_off_asset: SHY
+
+core_trend_2x:
+  type: core_trend_2x
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  fast_window: 50
+  slow_window: 200
+  core_asset: QQQ
+  core_weight: 0.5
+  tactical_weight: 0.5
+  asset_2x: QQQ_2X
+  asset_3x: QQQ_3X
+  risk_off_asset: SHY
+
+momentum_rotation_2x:
+  type: momentum_rotation_2x
+  rebalance_frequency: daily
+  assets:
+    - QQQ
+    - SPY
+    - XLK
+    - SMH
+    - GLD
+    - SHY
+  leveraged_assets:
+    QQQ: QQQ_2X
+    SPY: SPY_2X
+    XLK: XLK_2X
+    SMH: SMH_2X
+  lookback_months: 6
+  top_n: 2
+  ma_window: 200
+  fallback_asset: SHY
+
+breakout_3x_with_stop:
+  type: breakout_3x_with_stop
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  high_window: 252
+  near_high_threshold: 0.95
+  fast_window: 50
+  slow_window: 200
+  asset_1x: QQQ
+  asset_2x: QQQ_2X
+  asset_3x: QQQ_3X
+  risk_off_asset: SHY
+
+crash_protected_tqqq:
+  type: crash_protected_tqqq
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  ma_window: 200
+  slope_lookback: 20
+  asset_1x: QQQ
+  asset_3x: QQQ_3X
+  risk_off_asset: SHY
+
+adaptive_leverage_score:
+  type: adaptive_leverage_score
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  fast_window: 50
+  slow_window: 200
+  momentum_months: 6
+  vol_window: 20
+  vol_threshold: 0.25
+  drawdown_threshold: 0.10
+  asset_1x: QQQ
+  asset_2x: QQQ_2X
+  asset_3x: QQQ_3X
+  risk_off_asset: SHY
+
+dca_leverage_boost:
+  type: dca_leverage_boost
+  initial_capital: 20000
+  monthly_contribution: 3000
+  signal_asset: QQQ
+  fast_window: 50
+  ma_window: 200
+  normal_weights:
+    QQQ: 0.7
+    SPY: 0.2
+    SHY: 0.1
+  bull_weights:
+    QQQ_2X: 0.8
+    SPY: 0.2
+  strong_bull_weights:
+    QQQ_3X: 0.8
+    SPY: 0.2
+  bear_weights:
+    QQQ: 0.4
+    SHY: 0.6

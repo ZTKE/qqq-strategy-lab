@@ -27,6 +27,7 @@ def main() -> None:
 
     loader = DataLoader(PROJECT_ROOT / "data" / "raw")
     prices = loader.load_prices(tickers, start=args.start, end=args.end, force_refresh=args.force_refresh)
+    prices = add_synthetic_leverage_assets(prices, collect_required_assets(strategies_config))
 
     results = []
     for name, config in strategies_config.items():
@@ -68,30 +69,89 @@ def collect_tickers(assets_config: dict, strategies_config: dict) -> list[str]:
         tickers.update(group)
 
     for config in strategies_config.values():
-        for key in ["signal_asset", "fallback_asset", "core_asset", "risk_on_asset", "risk_off_asset"]:
+        for key in [
+            "signal_asset",
+            "fallback_asset",
+            "core_asset",
+            "risk_on_asset",
+            "risk_off_asset",
+            "asset_1x",
+            "asset_2x",
+            "asset_3x",
+        ]:
             if config.get(key):
-                tickers.add(config[key])
+                tickers.add(base_asset_name(config[key]))
         for key in ["assets"]:
-            tickers.update(config.get(key, []))
-        for key in ["weights", "risk_on", "risk_off", "normal_weights"]:
-            tickers.update((config.get(key) or {}).keys())
+            tickers.update(base_asset_name(asset) for asset in config.get(key, []))
+        for key in ["leveraged_assets"]:
+            tickers.update(base_asset_name(asset) for asset in (config.get(key) or {}).values())
+        for key in ["weights", "risk_on", "risk_off", "normal_weights", "bull_weights", "strong_bull_weights", "bear_weights"]:
+            tickers.update(base_asset_name(asset) for asset in (config.get(key) or {}).keys())
         for rule in config.get("rules", []):
-            tickers.update((rule.get("weights") or {}).keys())
+            tickers.update(base_asset_name(asset) for asset in (rule.get("weights") or {}).keys())
 
-    return sorted(tickers)
+    return sorted(ticker for ticker in tickers if ticker)
 
 
 def strategy_required_assets(config: dict) -> list[str]:
     assets: set[str] = set()
-    for key in ["signal_asset", "fallback_asset", "core_asset", "risk_on_asset", "risk_off_asset"]:
+    for key in [
+        "signal_asset",
+        "fallback_asset",
+        "core_asset",
+        "risk_on_asset",
+        "risk_off_asset",
+        "asset_1x",
+        "asset_2x",
+        "asset_3x",
+    ]:
         if config.get(key):
             assets.add(config[key])
     assets.update(config.get("assets", []))
-    for key in ["weights", "risk_on", "risk_off", "normal_weights"]:
+    assets.update((config.get("leveraged_assets") or {}).values())
+    for key in ["weights", "risk_on", "risk_off", "normal_weights", "bull_weights", "strong_bull_weights", "bear_weights"]:
         assets.update((config.get(key) or {}).keys())
     for rule in config.get("rules", []):
         assets.update((rule.get("weights") or {}).keys())
     return sorted(assets)
+
+
+def collect_required_assets(strategies_config: dict) -> list[str]:
+    assets: set[str] = set()
+    for config in strategies_config.values():
+        assets.update(strategy_required_assets(config))
+    return sorted(assets)
+
+
+def base_asset_name(asset: str) -> str:
+    if asset.endswith("_2X") or asset.endswith("_3X"):
+        return asset.rsplit("_", 1)[0]
+    return asset
+
+
+def leverage_multiple(asset: str) -> int | None:
+    if asset.endswith("_2X"):
+        return 2
+    if asset.endswith("_3X"):
+        return 3
+    return None
+
+
+def add_synthetic_leverage_assets(prices, required_assets: list[str]):
+    output = prices.copy()
+    for asset in required_assets:
+        multiple = leverage_multiple(asset)
+        if multiple is None or asset in output.columns:
+            continue
+        base_asset = base_asset_name(asset)
+        if base_asset not in output.columns:
+            raise ValueError(f"Cannot synthesize {asset}; missing base asset {base_asset}.")
+
+        base = output[base_asset].dropna()
+        leveraged_returns = base.pct_change().fillna(0.0) * multiple
+        leveraged_returns = leveraged_returns.clip(lower=-0.99)
+        output[asset] = (1.0 + leveraged_returns).cumprod() * float(base.iloc[0])
+    return output
 
 
 if __name__ == "__main__":
