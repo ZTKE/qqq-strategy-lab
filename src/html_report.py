@@ -54,6 +54,7 @@ def generate_html_report(
 
     context_by_strategy = _context_by_strategy(results or [])
     rows = [_serialize_row(row, context_by_strategy.get(str(row["Strategy"]), {})) for _, row in results_frame.iterrows()]
+    series = _serialize_interactive_series(results or [])
     first_context = next(iter(context_by_strategy.values()), {})
     meta = {
         "title": "QQQ 策略实验室",
@@ -71,6 +72,7 @@ def generate_html_report(
 
     html = HTML_TEMPLATE.replace("__REPORT_META__", json.dumps(meta, ensure_ascii=False, allow_nan=False))
     html = html.replace("__REPORT_ROWS__", json.dumps(rows, ensure_ascii=False, allow_nan=False))
+    html = html.replace("__REPORT_SERIES__", json.dumps(series, ensure_ascii=False, allow_nan=False))
 
     output_path = reports_path / "dashboard.html"
     output_path.write_text(html, encoding="utf-8")
@@ -91,6 +93,45 @@ def _context_by_strategy(results: list[BacktestResult]) -> dict[str, dict[str, A
             "monthlyContribution": result.metadata.get("monthly_contribution"),
         }
     return context
+
+
+def _serialize_interactive_series(results: list[BacktestResult]) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "strategies": [result.strategy_name for result in results],
+        "equity": {},
+        "drawdown": {},
+        "rolling": {},
+    }
+    for result in results:
+        name = result.strategy_name
+        equity = _month_end_sample(result.equity_curve)
+        performance = result.performance_curve.astype(float)
+        drawdown = performance / performance.cummax() - 1.0
+        rolling = performance / performance.shift(252) - 1.0
+        payload["equity"][name] = _series_points(equity)
+        payload["drawdown"][name] = _series_points(_month_end_sample(drawdown))
+        payload["rolling"][name] = _series_points(_month_end_sample(rolling.dropna()))
+    return payload
+
+
+def _month_end_sample(series: pd.Series) -> pd.Series:
+    clean = series.dropna().sort_index()
+    if clean.empty:
+        return clean
+    sampled = clean.resample("ME").last().dropna()
+    if sampled.empty or sampled.index[0] != clean.index[0]:
+        sampled = pd.concat([clean.iloc[[0]], sampled])
+    if sampled.index[-1] != clean.index[-1]:
+        sampled = pd.concat([sampled, clean.iloc[[-1]]])
+    return sampled[~sampled.index.duplicated(keep="last")]
+
+
+def _series_points(series: pd.Series) -> list[dict[str, Any]]:
+    return [
+        {"d": pd.Timestamp(index).date().isoformat(), "v": float(value)}
+        for index, value in series.items()
+        if pd.notna(value)
+    ]
 
 
 def _serialize_row(row: pd.Series, context: dict[str, Any]) -> dict[str, Any]:
@@ -805,6 +846,94 @@ HTML_TEMPLATE = r"""<!doctype html>
       display: block;
     }
 
+    .line-chart-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .line-chart-stage {
+      min-height: 460px;
+      overflow: auto;
+    }
+
+    .line-chart-stage svg {
+      width: 100%;
+      min-width: 820px;
+      height: auto;
+      display: block;
+    }
+
+    .line-legend {
+      display: grid;
+      gap: 6px;
+      max-height: 500px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .legend-item {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fbfcfc;
+      color: var(--ink);
+      min-height: 34px;
+      padding: 6px 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-align: left;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .legend-item:hover {
+      border-color: rgba(15, 118, 110, 0.42);
+      background: #f1faf7;
+    }
+
+    .legend-item.off {
+      color: var(--muted);
+      background: #f1f4f3;
+      text-decoration: line-through;
+    }
+
+    .legend-swatch {
+      width: 18px;
+      height: 3px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+
+    .legend-item.off .legend-swatch {
+      opacity: 0.35;
+    }
+
+    .legend-count {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      padding: 0 2px 4px;
+    }
+
+    .line-path {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .line-grid {
+      stroke: #e5ece9;
+      stroke-width: 1;
+    }
+
+    .line-axis {
+      stroke: #bfcbc7;
+      stroke-width: 1;
+    }
+
     .axis-label {
       fill: var(--muted);
       font-size: 11px;
@@ -1232,6 +1361,7 @@ HTML_TEMPLATE = r"""<!doctype html>
 
       .dashboard-grid,
       .chart-grid,
+      .line-chart-layout,
       .detail-layout {
         grid-template-columns: 1fr;
       }
@@ -1431,6 +1561,24 @@ HTML_TEMPLATE = r"""<!doctype html>
           <div id="methodPanel" class="method-list"></div>
         </section>
 
+        <section class="panel chart-panel" data-chart-panel="curves" aria-label="策略曲线图">
+          <div class="section-title">
+            <h2>策略曲线图</h2>
+            <div class="title-actions">
+              <small>图例可切换</small>
+              <button class="collapse-toggle" type="button" data-chart-toggle="curves"></button>
+            </div>
+          </div>
+          <div class="chart-hidden-note">已隐藏策略曲线图，点击显示按钮恢复。</div>
+          <div class="collapsible-content">
+            <div class="chip-grid" id="curveModeChips"></div>
+            <div class="line-chart-layout">
+              <div class="line-chart-stage" id="interactiveLineChart"></div>
+              <div class="line-legend" id="lineLegend"></div>
+            </div>
+          </div>
+        </section>
+
         <section class="chart-grid" aria-label="交互图表">
           <div class="panel chart-panel" data-chart-panel="rank">
             <div class="section-title">
@@ -1512,6 +1660,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   <script>
     const REPORT_META = __REPORT_META__;
     const REPORT_ROWS = __REPORT_ROWS__;
+    const REPORT_SERIES = __REPORT_SERIES__;
 
     const state = {
       filter: "all",
@@ -1523,9 +1672,12 @@ HTML_TEMPLATE = r"""<!doctype html>
       sortKey: "CAGR",
       sortDir: "desc",
       chartMetric: "CAGR",
+      curveMode: "equity",
       selected: null,
       imageIndex: 0,
+      hiddenSeries: {},
       chartVisibility: {
+        curves: true,
         rank: true,
         scatter: true,
         heatmap: true,
@@ -1534,6 +1686,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     };
 
     const chartOptions = [
+      ["curves", "曲线图"],
       ["rank", "排行图"],
       ["scatter", "散点图"],
       ["heatmap", "热力图"],
@@ -1559,6 +1712,33 @@ HTML_TEMPLATE = r"""<!doctype html>
       ["Sharpe", "夏普"],
       ["Calmar", "Calmar"],
       ["10Y CAGR", "10 年"]
+    ];
+
+    const curveModeOptions = [
+      ["equity", "净值"],
+      ["drawdown", "回撤"],
+      ["rolling", "滚动 1 年"]
+    ];
+
+    const lineColors = [
+      "#0f766e",
+      "#2563eb",
+      "#c05621",
+      "#7c3aed",
+      "#dc2626",
+      "#0891b2",
+      "#16a34a",
+      "#9333ea",
+      "#ea580c",
+      "#64748b",
+      "#be123c",
+      "#0d9488",
+      "#4f46e5",
+      "#ca8a04",
+      "#15803d",
+      "#b45309",
+      "#0369a1",
+      "#a21caf"
     ];
 
     const columns = [
@@ -1589,6 +1769,16 @@ HTML_TEMPLATE = r"""<!doctype html>
       return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value));
     }
 
+    function fmtCompactMoney(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        notation: "compact",
+        maximumFractionDigits: 1
+      }).format(Number(value));
+    }
+
     function fmtNum(value) {
       if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
       return Number(value).toFixed(2);
@@ -1615,10 +1805,34 @@ HTML_TEMPLATE = r"""<!doctype html>
       return String(value).replaceAll("_", " ");
     }
 
+    function fmtCurveValue(value) {
+      return state.curveMode === "equity" ? fmtCompactMoney(value) : fmtPct(value);
+    }
+
+    function fmtDate(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "";
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    }
+
     function metricFormatFor(key) {
       if (key.includes("Return") || key.includes("CAGR") || key.includes("Drawdown") || key.includes("MaxDD") || key === "Volatility") return "pct";
       if (key.includes("Equity") || key.includes("Invested")) return "money";
       return "num";
+    }
+
+    function colorForStrategy(strategyName) {
+      const seriesIndex = (REPORT_SERIES.strategies || []).indexOf(strategyName);
+      const rowIndex = REPORT_ROWS.findIndex(row => row.Strategy === strategyName);
+      const index = seriesIndex >= 0 ? seriesIndex : Math.max(0, rowIndex);
+      return lineColors[index % lineColors.length];
+    }
+
+    function parsedSeries(strategyName, seriesByStrategy) {
+      return (seriesByStrategy[strategyName] || [])
+        .map(point => ({ t: Date.parse(point.d), v: Number(point.v), d: point.d }))
+        .filter(point => Number.isFinite(point.t) && Number.isFinite(point.v))
+        .sort((a, b) => a.t - b.t);
     }
 
     function getFilteredRows() {
@@ -1734,6 +1948,17 @@ HTML_TEMPLATE = r"""<!doctype html>
           sync();
         });
       });
+
+      const curveModeHost = document.getElementById("curveModeChips");
+      curveModeHost.innerHTML = curveModeOptions.map(([value, label]) => (
+        `<button class="metric-chip ${state.curveMode === value ? "active" : ""}" type="button" data-curve-mode="${esc(value)}">${esc(label)}</button>`
+      )).join("");
+      curveModeHost.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => {
+          state.curveMode = button.dataset.curveMode;
+          sync();
+        });
+      });
     }
 
     function toggleChart(key) {
@@ -1748,7 +1973,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         const visible = state.chartVisibility[key] !== false;
         panel.classList.toggle("is-hidden", !visible);
       });
-      document.querySelectorAll("button[data-chart-toggle]").forEach(button => {
+      document.querySelectorAll("button.collapse-toggle[data-chart-toggle]").forEach(button => {
         const key = button.dataset.chartToggle;
         const visible = state.chartVisibility[key] !== false;
         button.textContent = visible ? "隐藏" : "显示";
@@ -1838,6 +2063,131 @@ HTML_TEMPLATE = r"""<!doctype html>
           state.selected = button.dataset.strategy;
           sync();
           document.getElementById("detailPanel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+      });
+    }
+
+    function renderInteractiveLineChart(rows) {
+      const chartHost = document.getElementById("interactiveLineChart");
+      const legendHost = document.getElementById("lineLegend");
+      const seriesByStrategy = REPORT_SERIES[state.curveMode] || {};
+      const strategies = rows
+        .map(row => row.Strategy)
+        .filter(strategy => (seriesByStrategy[strategy] || []).length);
+
+      const visibleCount = strategies.filter(strategy => !state.hiddenSeries[strategy]).length;
+      legendHost.innerHTML = strategies.length
+        ? `<div class="legend-count">${visibleCount} / ${strategies.length} 条曲线显示</div>` + strategies.map(strategy => {
+            const hidden = Boolean(state.hiddenSeries[strategy]);
+            return `<button class="legend-item ${hidden ? "off" : ""}" type="button" aria-pressed="${hidden ? "false" : "true"}" data-line-strategy="${esc(strategy)}">
+              <span class="legend-swatch" style="background:${colorForStrategy(strategy)}"></span>
+              <span>${esc(strategy)}</span>
+            </button>`;
+          }).join("")
+        : `<div class="legend-count">当前筛选没有可绘制曲线</div>`;
+
+      legendHost.querySelectorAll("[data-line-strategy]").forEach(button => {
+        button.addEventListener("click", () => {
+          const strategy = button.dataset.lineStrategy;
+          state.hiddenSeries[strategy] = !state.hiddenSeries[strategy];
+          renderInteractiveLineChart(getFilteredRows());
+        });
+      });
+
+      if (!strategies.length) {
+        chartHost.innerHTML = `<div class="empty-state">没有曲线可画。</div>`;
+        return;
+      }
+
+      const seriesMap = new Map(strategies.map(strategy => [strategy, parsedSeries(strategy, seriesByStrategy)]));
+      const visibleStrategies = strategies.filter(strategy => !state.hiddenSeries[strategy] && (seriesMap.get(strategy) || []).length);
+      if (!visibleStrategies.length) {
+        chartHost.innerHTML = `<div class="empty-state">全部曲线已隐藏。</div>`;
+        return;
+      }
+
+      const allPoints = visibleStrategies.flatMap(strategy => seriesMap.get(strategy));
+      const xValues = allPoints.map(point => point.t);
+      const yValues = allPoints.map(point => point.v);
+      let minX = Math.min(...xValues);
+      let maxX = Math.max(...xValues);
+      let minY = Math.min(...yValues);
+      let maxY = Math.max(...yValues);
+
+      if (minX === maxX) {
+        minX -= 86400000;
+        maxX += 86400000;
+      }
+      if (state.curveMode === "equity") {
+        minY = Math.max(0, minY * 0.96);
+        maxY = maxY * 1.04;
+      } else if (state.curveMode === "drawdown") {
+        minY = Math.min(minY * 1.08, minY - 0.01);
+        maxY = 0;
+      } else {
+        const yPad = Math.max(0.02, (maxY - minY) * 0.08);
+        minY -= yPad;
+        maxY += yPad;
+      }
+      if (minY === maxY) {
+        minY -= 0.01;
+        maxY += 0.01;
+      }
+
+      const width = 980;
+      const height = 500;
+      const pad = { left: 78, right: 28, top: 30, bottom: 48 };
+      const innerW = width - pad.left - pad.right;
+      const innerH = height - pad.top - pad.bottom;
+      const xScale = value => pad.left + (value - minX) / (maxX - minX) * innerW;
+      const yScale = value => height - pad.bottom - (value - minY) / (maxY - minY) * innerH;
+      const yTicks = Array.from({ length: 5 }, (_, index) => minY + (maxY - minY) * index / 4);
+      const xTicks = Array.from({ length: 4 }, (_, index) => minX + (maxX - minX) * index / 3);
+      const modeLabel = curveModeOptions.find(([value]) => value === state.curveMode)?.[1] || "曲线";
+
+      const yGrid = yTicks.map(value => {
+        const y = yScale(value);
+        return `<g>
+          <line class="line-grid" x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" />
+          <text class="axis-label" x="${pad.left - 10}" y="${y + 4}" text-anchor="end">${esc(fmtCurveValue(value))}</text>
+        </g>`;
+      }).join("");
+      const xGrid = xTicks.map(value => {
+        const x = xScale(value);
+        return `<g>
+          <line class="line-grid" x1="${x}" y1="${pad.top}" x2="${x}" y2="${height - pad.bottom}" />
+          <text class="axis-label" x="${x}" y="${height - 18}" text-anchor="middle">${esc(fmtDate(value))}</text>
+        </g>`;
+      }).join("");
+
+      const paths = visibleStrategies.map(strategy => {
+        const points = seriesMap.get(strategy);
+        const d = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xScale(point.t).toFixed(2)} ${yScale(point.v).toFixed(2)}`).join(" ");
+        const last = points[points.length - 1];
+        const color = colorForStrategy(strategy);
+        return `<g data-line-strategy="${esc(strategy)}">
+          <path class="line-path" d="${d}" stroke="${color}" stroke-width="${strategy === state.selected ? 3 : 2}" opacity="${strategy === state.selected ? 0.98 : 0.82}">
+            <title>${esc(strategy)} · ${esc(modeLabel)} · ${esc(fmtCurveValue(last.v))}</title>
+          </path>
+          <circle cx="${xScale(last.t)}" cy="${yScale(last.v)}" r="${strategy === state.selected ? 4 : 3}" fill="${color}" stroke="white" stroke-width="1.5">
+            <title>${esc(strategy)} · ${esc(fmtCurveValue(last.v))}</title>
+          </circle>
+        </g>`;
+      }).join("");
+
+      chartHost.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="策略${esc(modeLabel)}曲线">
+        ${yGrid}
+        ${xGrid}
+        <line class="line-axis" x1="${pad.left}" y1="${height - pad.bottom}" x2="${width - pad.right}" y2="${height - pad.bottom}" />
+        <line class="line-axis" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${height - pad.bottom}" />
+        <text class="axis-label" x="${pad.left}" y="18">${esc(modeLabel)}</text>
+        ${paths}
+      </svg>`;
+
+      chartHost.querySelectorAll("[data-line-strategy]").forEach(group => {
+        group.addEventListener("click", () => {
+          state.selected = group.dataset.lineStrategy;
+          sync();
         });
       });
     }
@@ -2136,6 +2486,7 @@ HTML_TEMPLATE = r"""<!doctype html>
       renderKpis(rows);
       renderDetail(rows);
       renderMethodPanel();
+      renderInteractiveLineChart(rows);
       renderBarChart(rows);
       renderScatter(rows);
       renderHeatmap(rows);
@@ -2153,7 +2504,10 @@ HTML_TEMPLATE = r"""<!doctype html>
       state.sortKey = "CAGR";
       state.sortDir = "desc";
       state.chartMetric = "CAGR";
+      state.curveMode = "equity";
+      state.hiddenSeries = {};
       state.chartVisibility = {
+        curves: true,
         rank: true,
         scatter: true,
         heatmap: true,
