@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from src.backtest import BacktestResult
+from src.html_report import generate_html_report
 from src.metrics import performance_summary, rolling_period_performance, yearly_returns
 
 
@@ -40,6 +41,14 @@ def generate_report(
         transaction_cost=transaction_cost,
     )
     (reports_path / "summary.md").write_text(summary, encoding="utf-8")
+    generate_html_report(
+        results_frame=results_frame,
+        reports_dir=reports_path,
+        start_date=start_date,
+        end_date=end_date,
+        transaction_cost=transaction_cost,
+        results=results,
+    )
     return results_frame
 
 
@@ -175,15 +184,20 @@ def _key_findings_lines(frame: pd.DataFrame) -> list[str]:
     benchmark = clean.loc[clean["Strategy"] == "qqq_buy_hold"]
     benchmark_row = benchmark.iloc[0] if not benchmark.empty else clean.iloc[0]
 
-    best_final = clean.loc[clean["Final Equity"].idxmax()]
-    best_cagr = clean.loc[clean["CAGR"].idxmax()]
-    lowest_drawdown = clean.loc[clean["Max Drawdown"].idxmax()]
-    best_calmar = clean.loc[clean["Calmar"].idxmax()]
+    best_final = _best_row_by(clean, "Final Equity")
+    best_cagr = _best_row_by(clean, "CAGR")
+    lowest_drawdown = _best_row_by(clean, "Max Drawdown")
+    best_calmar = _best_row_by(clean, "Calmar")
     best_risk_adjusted = best_calmar
-    best_1y = clean.loc[clean["1Y CAGR"].idxmax()]
-    best_3y = clean.loc[clean["3Y CAGR"].idxmax()]
-    best_5y = clean.loc[clean["5Y CAGR"].idxmax()]
-    best_10y = clean.loc[clean["10Y CAGR"].idxmax()]
+    best_1y = _best_row_by(clean, "1Y CAGR")
+    best_3y = _best_row_by(clean, "3Y CAGR")
+    best_5y = _best_row_by(clean, "5Y CAGR")
+    best_10y = _best_row_by(clean, "10Y CAGR")
+    fallback_row = clean.iloc[0]
+    best_final = best_final if best_final is not None else fallback_row
+    best_cagr = best_cagr if best_cagr is not None else fallback_row
+    lowest_drawdown = lowest_drawdown if lowest_drawdown is not None else fallback_row
+    best_risk_adjusted = best_risk_adjusted if best_risk_adjusted is not None else fallback_row
 
     rows = [
         [
@@ -212,14 +226,14 @@ def _key_findings_lines(frame: pd.DataFrame) -> list[str]:
         ],
         [
             "近 1/3/5 年最强",
-            f"{best_1y['Strategy']} / {best_3y['Strategy']} / {best_5y['Strategy']}",
-            f"{_fmt_pct(best_1y['1Y CAGR'])} / {_fmt_pct(best_3y['3Y CAGR'])} / {_fmt_pct(best_5y['5Y CAGR'])}",
+            f"{_strategy_or_na(best_1y)} / {_strategy_or_na(best_3y)} / {_strategy_or_na(best_5y)}",
+            f"{_value_or_na(best_1y, '1Y CAGR', _fmt_pct)} / {_value_or_na(best_3y, '3Y CAGR', _fmt_pct)} / {_value_or_na(best_5y, '5Y CAGR', _fmt_pct)}",
             "回答“最近这轮行情谁最强”。",
         ],
         [
             "近 10 年最强",
-            best_10y["Strategy"],
-            _fmt_pct(best_10y["10Y CAGR"]),
+            _strategy_or_na(best_10y),
+            _value_or_na(best_10y, "10Y CAGR", _fmt_pct),
             "回答“中长期牛市里谁最能吃到上涨”。",
         ],
     ]
@@ -249,6 +263,25 @@ def _key_findings_lines(frame: pd.DataFrame) -> list[str]:
         )
 
     return lines
+
+
+def _best_row_by(frame: pd.DataFrame, column: str) -> pd.Series | None:
+    values = pd.to_numeric(frame[column], errors="coerce")
+    if values.dropna().empty:
+        return None
+    return frame.loc[values.idxmax()]
+
+
+def _strategy_or_na(row: pd.Series | None) -> str:
+    if row is None:
+        return "N/A"
+    return str(row["Strategy"])
+
+
+def _value_or_na(row: pd.Series | None, column: str, formatter) -> str:
+    if row is None:
+        return "N/A"
+    return formatter(row[column])
 
 
 def _value_for(frame: pd.DataFrame, strategy_name: str, column: str):

@@ -45,6 +45,7 @@ class DataLoader:
         cache_path = self.raw_dir / f"{ticker}.csv"
         if cache_path.exists() and not force_refresh:
             cached = self._read_cache(cache_path, ticker)
+            cached = self._filter_date_range(cached, start, end)
             if not cached.empty:
                 return cached
 
@@ -55,6 +56,7 @@ class DataLoader:
         except Exception:
             if cache_path.exists():
                 cached = self._read_cache(cache_path, ticker)
+                cached = self._filter_date_range(cached, start, end)
                 if not cached.empty:
                     print(f"Warning: yfinance failed for {ticker}; using cached CSV.")
                     return cached
@@ -72,16 +74,28 @@ class DataLoader:
         series.name = ticker
         return series
 
+    def _filter_date_range(self, series: pd.Series, start: str, end: str | None) -> pd.Series:
+        start_date = pd.Timestamp(start)
+        output = series.loc[series.index >= start_date]
+        if end:
+            # User-facing end dates are inclusive; yfinance receives the equivalent exclusive date.
+            output = output.loc[output.index <= pd.Timestamp(end)]
+        return output
+
     def _download(self, ticker: str, start: str, end: str | None) -> pd.Series:
         try:
             import yfinance as yf
         except ImportError as exc:
             raise RuntimeError("yfinance is not installed. Run: pip install -r requirements.txt") from exc
 
+        yfinance_end = None
+        if end:
+            yfinance_end = (pd.Timestamp(end) + pd.Timedelta(days=1)).date().isoformat()
+
         data = yf.download(
             ticker,
             start=start,
-            end=end,
+            end=yfinance_end,
             auto_adjust=True,
             progress=False,
             threads=False,

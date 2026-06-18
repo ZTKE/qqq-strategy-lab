@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import copy
 from pathlib import Path
 
+import pandas as pd
 import yaml
 
 from src.backtest import BacktestEngine
@@ -12,55 +14,106 @@ from src.strategies import build_strategy
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_INITIAL_CAPITAL = 20000.0
+DEFAULT_MONTHLY_CONTRIBUTION = 3000.0
+DEFAULT_TRANSACTION_COST = 0.0005
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run QQQ Strategy Lab backtests.")
     parser.add_argument("--start", default="2000-01-01", help="Download start date, YYYY-MM-DD.")
-    parser.add_argument("--end", default=None, help="Download end date, YYYY-MM-DD. Defaults to today.")
+    parser.add_argument("--end", default=None, help="Inclusive end date, YYYY-MM-DD. Defaults to latest available data.")
+    parser.add_argument("--initial-capital", type=float, default=DEFAULT_INITIAL_CAPITAL, help="Initial investment amount.")
+    parser.add_argument(
+        "--monthly-contribution",
+        type=float,
+        default=DEFAULT_MONTHLY_CONTRIBUTION,
+        help="Monthly contribution amount.",
+    )
+    parser.add_argument("--transaction-cost", type=float, default=DEFAULT_TRANSACTION_COST, help="Transaction cost rate.")
     parser.add_argument("--force-refresh", action="store_true", help="Ignore cached CSV files and re-download.")
     args = parser.parse_args()
+
+    run_backtests(
+        start=args.start,
+        end=args.end,
+        force_refresh=args.force_refresh,
+        initial_capital=args.initial_capital,
+        monthly_contribution=args.monthly_contribution,
+        transaction_cost=args.transaction_cost,
+    )
+
+    print("Backtest complete.")
+    print(f"Project: {PROJECT_ROOT}")
+    print(f"Report: {PROJECT_ROOT / 'reports' / 'summary.md'}")
+    print(f"Dashboard: {PROJECT_ROOT / 'reports' / 'dashboard.html'}")
+    print(f"Results: {PROJECT_ROOT / 'reports' / 'results.csv'}")
+
+
+def run_backtests(
+    start: str = "2000-01-01",
+    end: str | None = None,
+    force_refresh: bool = False,
+    initial_capital: float = DEFAULT_INITIAL_CAPITAL,
+    monthly_contribution: float = DEFAULT_MONTHLY_CONTRIBUTION,
+    transaction_cost: float = DEFAULT_TRANSACTION_COST,
+) -> pd.DataFrame:
+    if initial_capital < 0:
+        raise ValueError("initial_capital must be non-negative.")
+    if monthly_contribution < 0:
+        raise ValueError("monthly_contribution must be non-negative.")
+    if transaction_cost < 0:
+        raise ValueError("transaction_cost must be non-negative.")
 
     assets_config = _load_yaml(PROJECT_ROOT / "configs" / "assets.yaml")
     strategies_config = _load_yaml(PROJECT_ROOT / "configs" / "strategies.yaml")
     tickers = collect_tickers(assets_config, strategies_config)
 
     loader = DataLoader(PROJECT_ROOT / "data" / "raw")
-    prices = loader.load_prices(tickers, start=args.start, end=args.end, force_refresh=args.force_refresh)
+    prices = loader.load_prices(tickers, start=start, end=end, force_refresh=force_refresh)
     prices = add_synthetic_leverage_assets(prices, collect_required_assets(strategies_config))
 
     results = []
     for name, config in strategies_config.items():
-        required_assets = strategy_required_assets(config)
+        strategy_config = _with_cashflow_settings(config, initial_capital, monthly_contribution)
+        required_assets = strategy_required_assets(strategy_config)
         strategy_prices = prices[required_assets].ffill().dropna(how="all")
         if strategy_prices.empty:
             raise RuntimeError(f"No aligned price history is available for strategy {name}: {required_assets}")
 
-        strategy = build_strategy(name, config)
-        engine = BacktestEngine(strategy_prices, initial_capital=20000.0, monthly_contribution=3000.0, transaction_cost=0.0005)
+        strategy = build_strategy(name, strategy_config)
+        engine = BacktestEngine(
+            strategy_prices,
+            initial_capital=initial_capital,
+            monthly_contribution=monthly_contribution,
+            transaction_cost=transaction_cost,
+        )
         result = engine.run(strategy)
         result.metadata["required_assets"] = required_assets
         result.metadata["start_date"] = strategy_prices.index[0]
         result.metadata["end_date"] = strategy_prices.index[-1]
         results.append(result)
 
-    generate_report(
+    return generate_report(
         results=results,
         reports_dir=PROJECT_ROOT / "reports",
         start_date=min(result.equity_curve.index[0] for result in results),
         end_date=max(result.equity_curve.index[-1] for result in results),
-        transaction_cost=0.0005,
+        transaction_cost=transaction_cost,
     )
-
-    print("Backtest complete.")
-    print(f"Project: {PROJECT_ROOT}")
-    print(f"Report: {PROJECT_ROOT / 'reports' / 'summary.md'}")
-    print(f"Results: {PROJECT_ROOT / 'reports' / 'results.csv'}")
 
 
 def _load_yaml(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as handle:
         return yaml.safe_load(handle) or {}
+
+
+def _with_cashflow_settings(config: dict, initial_capital: float, monthly_contribution: float) -> dict:
+    output = copy.deepcopy(config)
+    if str(output.get("type", "")).startswith("dca"):
+        output["initial_capital"] = float(initial_capital)
+        output["monthly_contribution"] = float(monthly_contribution)
+    return output
 
 
 def collect_tickers(assets_config: dict, strategies_config: dict) -> list[str]:

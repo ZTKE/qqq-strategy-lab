@@ -26,7 +26,10 @@ python -m src.main
 
 ```bat
 python -m src.main --start 2000-01-01 --force-refresh
+python -m src.main --start 2010-01-01 --end 2024-12-31 --initial-capital 50000 --monthly-contribution 5000
 ```
+
+`--end` 按包含该日期处理。`--initial-capital` 和 `--monthly-contribution` 会统一应用到所有策略，包括 DCA 策略。
 
 `run.bat` 会执行默认命令。
 
@@ -62,6 +65,7 @@ pytest
 
 - `reports/results.csv`：汇总指标和滚动周期指标。
 - `reports/summary.md`：Markdown 格式报告。
+- `reports/dashboard.html`：可点击筛选、排序和查看图表的交互式网页报告。
 - `reports/charts/equity_curves.png`：净值曲线。
 - `reports/charts/drawdowns.png`：回撤曲线。
 - `reports/charts/rolling_returns.png`：滚动一年收益率。

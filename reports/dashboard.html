@@ -1,0 +1,1905 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QQQ 策略实验室 - 交互式结果报告</title>
+  <style>
+    :root {
+      --bg: #f6f8f7;
+      --surface: #ffffff;
+      --surface-soft: #eef3f1;
+      --ink: #18211f;
+      --muted: #66736f;
+      --line: #d8e0dd;
+      --accent: #0f766e;
+      --accent-strong: #0b5f59;
+      --blue: #2563eb;
+      --orange: #c05621;
+      --red: #b42318;
+      --green: #0b7a53;
+      --shadow: 0 12px 34px rgba(24, 33, 31, 0.10);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: light;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Inter", "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .page-shell {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) auto;
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 18px;
+    }
+
+    .title-block h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      line-height: 1.12;
+      font-weight: 760;
+      overflow-wrap: anywhere;
+    }
+
+    .meta-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .meta-pill {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.72);
+      border-radius: 999px;
+      padding: 5px 9px;
+      white-space: nowrap;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--ink);
+      min-height: 36px;
+      padding: 7px 12px;
+      border-radius: var(--radius);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.8);
+    }
+
+    .button:hover {
+      border-color: #b9c8c4;
+      background: #fbfdfc;
+    }
+
+    .button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .button.primary:hover {
+      background: var(--accent-strong);
+      border-color: var(--accent-strong);
+    }
+
+    .icon {
+      width: 16px;
+      height: 16px;
+      display: inline-block;
+      flex: 0 0 auto;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .kpi-card,
+    .panel,
+    .control-surface {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .kpi-card {
+      min-height: 126px;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .kpi-label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .kpi-value {
+      font-size: 23px;
+      line-height: 1.08;
+      font-weight: 760;
+    }
+
+    .kpi-owner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      min-width: 0;
+    }
+
+    .strategy-name {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-weight: 650;
+      color: var(--ink);
+    }
+
+    .delta-pill {
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: var(--surface-soft);
+      white-space: nowrap;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .delta-pill.good {
+      background: #e5f5ee;
+      color: var(--green);
+    }
+
+    .delta-pill.risk {
+      background: #fff0e8;
+      color: var(--orange);
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .control-surface {
+      position: sticky;
+      top: 14px;
+      padding: 15px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .title-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .section-title h2,
+    .section-title h3 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.25;
+    }
+
+    .section-title small {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .collapse-toggle {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fbfcfc;
+      color: var(--ink);
+      min-height: 30px;
+      padding: 5px 9px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .collapse-toggle:hover {
+      border-color: rgba(15, 118, 110, 0.48);
+      background: #f1faf7;
+    }
+
+    .chart-panel.is-hidden .collapsible-content {
+      display: none;
+    }
+
+    .chart-panel.is-hidden {
+      box-shadow: none;
+    }
+
+    .chart-hidden-note {
+      display: none;
+      min-height: 84px;
+      place-items: center;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+      padding: 16px;
+    }
+
+    .chart-panel.is-hidden .chart-hidden-note {
+      display: grid;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .searchbox,
+    .selectbox {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+      color: var(--ink);
+      padding: 8px 10px;
+      outline: none;
+    }
+
+    .searchbox:focus,
+    .selectbox:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+    }
+
+    .chip-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .filter-chip,
+    .metric-chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fbfcfc;
+      color: var(--ink);
+      padding: 7px 10px;
+      min-height: 34px;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    .filter-chip.active,
+    .metric-chip.active {
+      color: white;
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .range-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .toggle-row {
+      display: grid;
+      gap: 9px;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .toggle input {
+      width: 17px;
+      height: 17px;
+      accent-color: var(--accent);
+    }
+
+    .chart-toggle-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .chart-toggle {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+      color: var(--ink);
+      min-height: 36px;
+      padding: 7px 9px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    .chart-toggle::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex: 0 0 auto;
+    }
+
+    .chart-toggle.off {
+      color: var(--muted);
+      background: #f1f4f3;
+    }
+
+    .chart-toggle.off::before {
+      background: #a9b6b2;
+    }
+
+    .param-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .param-input {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+      color: var(--ink);
+      padding: 7px 9px;
+      outline: none;
+    }
+
+    .command-box {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #f3f7f6;
+      color: #283633;
+      padding: 10px;
+      min-height: 82px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .main-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .panel {
+      padding: 16px;
+      min-width: 0;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+      gap: 16px;
+    }
+
+    .chart-stage {
+      min-height: 300px;
+      overflow: hidden;
+    }
+
+    .chart-stage svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .axis-label {
+      fill: var(--muted);
+      font-size: 11px;
+    }
+
+    .bar-label,
+    .point-label {
+      fill: var(--ink);
+      font-size: 12.5px;
+      font-weight: 620;
+    }
+
+    .bar-value {
+      fill: var(--muted);
+      font-size: 12px;
+    }
+
+    .empty-state {
+      min-height: 180px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+      text-align: center;
+      padding: 18px;
+    }
+
+    .detail-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 0.9fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .detail-name {
+      margin: 0 0 8px;
+      font-size: 21px;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-text {
+      color: var(--muted);
+      line-height: 1.58;
+      margin: 0 0 12px;
+      font-size: 14px;
+    }
+
+    .implementation-box {
+      margin-top: 12px;
+      border-left: 3px solid var(--accent);
+      background: #f4faf8;
+      padding: 10px 12px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: #31413d;
+      line-height: 1.58;
+      font-size: 13px;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .tag {
+      border-radius: 999px;
+      padding: 5px 8px;
+      background: var(--surface-soft);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .mini-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .mini-metric {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      background: #fbfcfc;
+      min-height: 70px;
+    }
+
+    .mini-metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .mini-metric strong {
+      display: block;
+      font-size: 17px;
+      overflow-wrap: anywhere;
+    }
+
+    .method-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .method-item {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+      color: var(--ink);
+      padding: 11px 12px;
+      text-align: left;
+      display: grid;
+      grid-template-columns: minmax(170px, 0.34fr) minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .method-item:hover,
+    .method-item.selected {
+      border-color: rgba(15, 118, 110, 0.48);
+      background: #f1faf7;
+    }
+
+    .method-name {
+      font-weight: 760;
+      overflow-wrap: anywhere;
+      line-height: 1.35;
+    }
+
+    .method-meta {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .method-text {
+      color: #31413d;
+      line-height: 1.58;
+      font-size: 13px;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      max-height: 620px;
+      background: var(--surface);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1040px;
+    }
+
+    th,
+    td {
+      padding: 10px 11px;
+      border-bottom: 1px solid var(--line);
+      text-align: right;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f0f4f3;
+      color: #394743;
+      font-size: 12px;
+      font-weight: 720;
+      user-select: none;
+    }
+
+    th.sortable {
+      cursor: pointer;
+    }
+
+    th:first-child,
+    td:first-child {
+      text-align: left;
+      position: sticky;
+      left: 0;
+      background: inherit;
+      z-index: 2;
+      max-width: 260px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    th:first-child {
+      z-index: 3;
+      background: #f0f4f3;
+    }
+
+    tbody tr {
+      background: var(--surface);
+      cursor: pointer;
+    }
+
+    tbody tr:hover {
+      background: #f8fbfa;
+    }
+
+    tbody tr.selected {
+      background: #e8f4f1;
+    }
+
+    .table-strategy-name {
+      cursor: help;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 3px;
+    }
+
+    .strategy-tooltip {
+      position: fixed;
+      z-index: 999;
+      width: min(440px, calc(100vw - 28px));
+      border: 1px solid rgba(15, 118, 110, 0.30);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.98);
+      color: var(--ink);
+      box-shadow: 0 18px 48px rgba(24, 33, 31, 0.18);
+      padding: 13px 14px;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+
+    .strategy-tooltip.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .strategy-tooltip[hidden] {
+      display: none;
+    }
+
+    .tooltip-title {
+      margin: 0 0 5px;
+      font-size: 15px;
+      line-height: 1.35;
+      font-weight: 760;
+      overflow-wrap: anywhere;
+    }
+
+    .tooltip-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .tooltip-pill {
+      border-radius: 999px;
+      background: var(--surface-soft);
+      color: var(--muted);
+      padding: 4px 7px;
+      font-size: 11px;
+      line-height: 1.2;
+    }
+
+    .tooltip-body {
+      color: #31413d;
+      font-size: 12px;
+      line-height: 1.55;
+      margin: 0 0 8px;
+    }
+
+    .tooltip-body strong {
+      color: var(--ink);
+    }
+
+    .tooltip-kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .tooltip-kpi {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fbfcfc;
+      padding: 6px;
+      min-width: 0;
+    }
+
+    .tooltip-kpi span {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      margin-bottom: 3px;
+    }
+
+    .tooltip-kpi strong {
+      display: block;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .number.good {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .number.bad {
+      color: var(--red);
+      font-weight: 700;
+    }
+
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      margin-right: 7px;
+      border-radius: 50%;
+      background: var(--surface-soft);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 760;
+      vertical-align: middle;
+    }
+
+    .rank-badge.top {
+      background: #dff3ec;
+      color: var(--green);
+    }
+
+    .heatmap {
+      display: grid;
+      gap: 6px;
+      overflow: auto;
+      padding-bottom: 3px;
+    }
+
+    .heat-row {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) repeat(5, minmax(74px, 0.34fr));
+      gap: 6px;
+      align-items: stretch;
+      min-width: 640px;
+    }
+
+    .heat-cell {
+      border: 0;
+      border-radius: 7px;
+      padding: 7px 8px;
+      min-height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      font-size: 12px;
+      font-weight: 680;
+      color: #17332a;
+    }
+
+    button.heat-cell {
+      cursor: pointer;
+      font: inherit;
+    }
+
+    button.heat-cell:hover {
+      outline: 2px solid rgba(15, 118, 110, 0.28);
+      outline-offset: 0;
+    }
+
+    .heat-name {
+      justify-content: flex-start;
+      background: #f1f5f4;
+      color: var(--ink);
+      overflow-wrap: anywhere;
+    }
+
+    .heat-head {
+      background: transparent;
+      color: var(--muted);
+      font-weight: 700;
+      min-height: 22px;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+
+    .image-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .image-frame {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+      overflow: auto;
+      min-height: 360px;
+    }
+
+    .image-frame img {
+      display: block;
+      width: 100%;
+      min-width: 760px;
+      height: auto;
+    }
+
+    .footnote {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      margin: 0;
+    }
+
+    @media (max-width: 1120px) {
+      .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .dashboard-grid,
+      .chart-grid,
+      .detail-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .control-surface {
+        position: static;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .page-shell {
+        padding: 14px;
+      }
+
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .action-row {
+        justify-content: stretch;
+      }
+
+      .action-row .button {
+        flex: 1 1 auto;
+        justify-content: center;
+      }
+
+      .kpi-grid,
+      .mini-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .title-block h1 {
+        font-size: 24px;
+      }
+
+      .kpi-value {
+        font-size: 20px;
+      }
+
+      .param-grid,
+      .method-item {
+        grid-template-columns: 1fr;
+      }
+
+      .tooltip-kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .kpi-owner {
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .delta-pill,
+      .meta-pill {
+        white-space: normal;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page-shell">
+    <header class="topbar">
+      <div class="title-block">
+        <h1 id="reportTitle">QQQ 策略实验室</h1>
+        <div class="meta-line" id="metaLine"></div>
+      </div>
+      <div class="action-row">
+        <button class="button" id="resetFilters" type="button" title="清空筛选条件">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4v6h6M20 20v-6h-6M5 15a7 7 0 0 0 12 3l3-3M19 9A7 7 0 0 0 7 6l-3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          重置
+        </button>
+        <button class="button primary" id="downloadCsv" type="button" title="下载当前筛选后的表格">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          导出 CSV
+        </button>
+      </div>
+    </header>
+
+    <section class="kpi-grid" id="kpiGrid"></section>
+
+    <div class="dashboard-grid">
+      <aside class="control-surface" aria-label="筛选条件">
+        <div>
+          <div class="section-title">
+            <h2>筛选策略</h2>
+            <small id="resultCount"></small>
+          </div>
+          <div class="field">
+            <label for="searchInput">搜索名称 / 资产</label>
+            <input class="searchbox" id="searchInput" type="search" placeholder="例如 trend、QQQ_3X、SHY" />
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="section-title">
+            <h3>回测参数</h3>
+            <small>填完后重新运行</small>
+          </div>
+          <div class="param-grid">
+            <div>
+              <label for="paramStart">开始日期</label>
+              <input class="param-input" id="paramStart" type="date" />
+            </div>
+            <div>
+              <label for="paramEnd">结束日期</label>
+              <input class="param-input" id="paramEnd" type="date" />
+            </div>
+            <div>
+              <label for="paramInitial">初始资金</label>
+              <input class="param-input" id="paramInitial" type="number" min="0" step="1000" />
+            </div>
+            <div>
+              <label for="paramMonthly">每月追加</label>
+              <input class="param-input" id="paramMonthly" type="number" min="0" step="100" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="runCommand">运行命令</label>
+            <div class="command-box" id="runCommand"></div>
+            <button class="button" id="copyCommand" type="button" title="复制这条命令">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 8h10v12H8zM6 16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+              复制命令
+            </button>
+          </div>
+          <p class="footnote">当前文件是静态报告，改参数后需要运行上面的命令重新生成结果。</p>
+        </div>
+
+        <div class="field">
+          <label>点击标签筛选</label>
+          <div class="chip-grid" id="filterChips"></div>
+        </div>
+
+        <div class="field">
+          <label>图表显示</label>
+          <div class="chart-toggle-grid" id="chartToggles"></div>
+        </div>
+
+        <div class="field">
+          <label for="sortSelect">排序方式</label>
+          <select class="selectbox" id="sortSelect">
+            <option value="CAGR:desc">年化收益从高到低</option>
+            <option value="Final Equity:desc">最终净值从高到低</option>
+            <option value="Max Drawdown:desc">最大回撤从低到高</option>
+            <option value="Sharpe:desc">夏普比率从高到低</option>
+            <option value="Calmar:desc">Calmar 从高到低</option>
+            <option value="Volatility:asc">波动率从低到高</option>
+            <option value="1Y CAGR:desc">近 1 年年化从高到低</option>
+            <option value="3Y CAGR:desc">近 3 年年化从高到低</option>
+            <option value="10Y CAGR:desc">近 10 年年化从高到低</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <div class="range-row">
+            <label for="minCagr">最低年化收益</label>
+            <strong id="minCagrValue"></strong>
+          </div>
+          <input id="minCagr" type="range" min="0" max="30" step="1" value="0" />
+        </div>
+
+        <div class="field">
+          <div class="range-row">
+            <label for="maxDrawdown">最大可承受回撤</label>
+            <strong id="maxDrawdownValue"></strong>
+          </div>
+          <input id="maxDrawdown" type="range" min="30" max="90" step="1" value="90" />
+        </div>
+
+        <div class="toggle-row">
+          <label class="toggle">
+            <input id="beatQqqToggle" type="checkbox" />
+            年化收益高于 QQQ
+          </label>
+          <label class="toggle">
+            <input id="betterDdToggle" type="checkbox" />
+            最大回撤优于 QQQ
+          </label>
+        </div>
+      </aside>
+
+      <div class="main-stack">
+        <section class="panel" aria-label="策略详情">
+          <div class="section-title">
+            <h2>当前策略</h2>
+            <small>点击表格行切换</small>
+          </div>
+          <div id="detailPanel"></div>
+        </section>
+
+        <section class="panel" aria-label="策略实施说明">
+          <div class="section-title">
+            <h2>全部策略实施说明</h2>
+            <small>点击可联动详情</small>
+          </div>
+          <div id="methodPanel" class="method-list"></div>
+        </section>
+
+        <section class="chart-grid" aria-label="交互图表">
+          <div class="panel chart-panel" data-chart-panel="rank">
+            <div class="section-title">
+              <h2>收益 / 回撤排行</h2>
+              <div class="title-actions">
+                <small>受筛选影响</small>
+                <button class="collapse-toggle" type="button" data-chart-toggle="rank"></button>
+              </div>
+            </div>
+            <div class="chart-hidden-note">已隐藏收益 / 回撤排行，点击显示按钮恢复。</div>
+            <div class="collapsible-content">
+              <div class="chip-grid" id="metricChips"></div>
+              <div class="chart-stage" id="barChart"></div>
+            </div>
+          </div>
+
+          <div class="panel chart-panel" data-chart-panel="scatter">
+            <div class="section-title">
+              <h2>风险收益散点</h2>
+              <div class="title-actions">
+                <small>横轴波动，纵轴年化</small>
+                <button class="collapse-toggle" type="button" data-chart-toggle="scatter"></button>
+              </div>
+            </div>
+            <div class="chart-hidden-note">已隐藏风险收益散点，点击显示按钮恢复。</div>
+            <div class="collapsible-content">
+              <div class="chart-stage" id="scatterChart"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel chart-panel" data-chart-panel="heatmap" aria-label="滚动周期热力图">
+          <div class="section-title">
+            <h2>近 1 / 3 / 5 / 7 / 10 年年化热力图</h2>
+            <div class="title-actions">
+              <small>绿色越深越强</small>
+              <button class="collapse-toggle" type="button" data-chart-toggle="heatmap"></button>
+            </div>
+          </div>
+          <div class="chart-hidden-note">已隐藏滚动年化热力图，点击显示按钮恢复。</div>
+          <div class="collapsible-content">
+            <div id="heatmap" class="heatmap"></div>
+          </div>
+        </section>
+
+        <section class="panel" aria-label="数据表">
+          <div class="section-title">
+            <h2>策略数据表</h2>
+            <small>点表头排序</small>
+          </div>
+          <div class="table-wrap">
+            <table id="resultsTable"></table>
+          </div>
+        </section>
+
+        <section class="panel chart-panel" data-chart-panel="images" aria-label="原始图表">
+          <div class="section-title">
+            <h2>原始回测图</h2>
+            <div class="title-actions">
+              <small>来自 reports/charts</small>
+              <button class="collapse-toggle" type="button" data-chart-toggle="images"></button>
+            </div>
+          </div>
+          <div class="chart-hidden-note">已隐藏原始回测图，点击显示按钮恢复。</div>
+          <div class="collapsible-content">
+            <div class="image-tabs" id="imageTabs"></div>
+            <div class="image-frame">
+              <img id="chartImage" alt="回测图表" />
+            </div>
+            <p class="footnote">提示：上方交互图表来自汇总指标，原始 PNG 图保留完整时间序列视角。历史回测不构成投资建议。</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div id="strategyTooltip" class="strategy-tooltip" role="tooltip" hidden></div>
+
+  <script>
+    const REPORT_META = {"title": "QQQ 策略实验室", "subtitle": "交互式回测结果控制台", "startDate": "2000-01-03", "endDate": "2026-06-15", "generatedAt": "2026-06-18 21:04", "transactionCost": 0.0005, "initialCapital": 20000.0, "monthlyContribution": 3000.0, "strategyCount": 18, "totalInvested": 971000.0, "chartImages": [{"label": "净值曲线", "src": "charts/equity_curves.png"}, {"label": "回撤曲线", "src": "charts/drawdowns.png"}, {"label": "滚动收益", "src": "charts/rolling_returns.png"}]};
+    const REPORT_ROWS = [{"Strategy": "qqq_buy_hold", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ", "Total Return": 11.524384548560981, "CAGR": 0.09102897610174865, "Max Drawdown": -0.8298300226911628, "Volatility": 0.2675183929005332, "Sharpe": 0.45916858757139906, "Calmar": 0.10969593002496951, "Final Equity": 12161177.396652713, "Total Invested": 971000.0, "1Y Total Return": 0.3992400172101802, "1Y CAGR": 0.40300543973958547, "1Y MaxDD": -0.11964432576071915, "1Y Volatility": 0.17423304828285913, "1Y Sharpe": 2.031689241311657, "1Y Calmar": 3.3683623287373448, "3Y Total Return": 1.0450273869677926, "3Y CAGR": 0.27132298606518046, "3Y MaxDD": -0.2276834005349283, "3Y Volatility": 0.20024619704423183, "3Y Sharpe": 1.2989264875725217, "3Y Calmar": 1.191667839762247, "5Y Total Return": 1.2399919323827904, "5Y CAGR": 0.1757862352780164, "5Y MaxDD": -0.3511894868104243, "5Y Volatility": 0.22594619414728856, "5Y Sharpe": 0.8296380076909273, "5Y Calmar": 0.5005452665298823, "7Y Total Return": 3.228467195870107, "7Y CAGR": 0.22958913104934586, "7Y MaxDD": -0.3511894868104243, "7Y Volatility": 0.24363886855161904, "7Y Sharpe": 0.9706419627283509, "7Y Calmar": 0.6537471640581327, "10Y Total Return": 6.412900932346672, "10Y CAGR": 0.22247829263070895, "10Y MaxDD": -0.3511894868104243, "10Y Volatility": 0.22404366750137228, "10Y Sharpe": 1.0091742812648752, "10Y Calmar": 0.6334992959251227, "Tags": ["基准", "无杠杆"], "Description": "100% 长期持有 QQQ，作为所有策略的基础对照。", "Implementation": "首日按目标权重买入并长期持有；目标权重为 `QQQ` 100.00%。", "Strategy Type": "buy_and_hold", "Mode": "rebalanced", "Rebalance Frequency": "monthly"}, {"Strategy": "qqq_80_spy_20", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, SPY", "Total Return": 9.865278880875755, "CAGR": 0.09131093477881458, "Max Drawdown": -0.7812440575724392, "Volatility": 0.2476228169805323, "Sharpe": 0.47650162873944835, "Calmar": 0.11687888553360032, "Final Equity": 10550185.793330358, "Total Invested": 971000.0, "1Y Total Return": 0.3676073267515745, "1Y CAGR": 0.371036794646874, "1Y MaxDD": -0.11160916696430145, "1Y Volatility": 0.1623596777827222, "1Y Sharpe": 2.0258399201192026, "1Y Calmar": 3.324429388184138, "3Y Total Return": 0.982284857957443, "3Y CAGR": 0.25809907842781055, "3Y MaxDD": -0.21980692423824133, "3Y Volatility": 0.18930797076446046, "3Y Sharpe": 1.3074794642253, "3Y Calmar": 1.1742081343537005, "5Y Total Return": 1.1667032774211137, "5Y CAGR": 0.16795862280349794, "5Y MaxDD": -0.32982080170663186, "5Y Volatility": 0.21349899764275213, "5Y Sharpe": 0.8339096491995254, "5Y Calmar": 0.5092420548807389, "7Y Total Return": 2.921149815253238, "7Y CAGR": 0.21636153162138694, "7Y MaxDD": -0.32982080170663186, "7Y Volatility": 0.2323765086191824, "7Y Sharpe": 0.9595727888104523, "7Y Calmar": 0.6559972278941812, "10Y Total Return": 5.651181197418145, "10Y CAGR": 0.2092583576830167, "10Y MaxDD": -0.32982080170663186, "10Y Volatility": 0.21309454500870054, "10Y Sharpe": 0.9987299087652699, "10Y Calmar": 0.6344607635425836, "Tags": ["静态配置", "无杠杆"], "Description": "每月再平衡到 80% QQQ / 20% SPY，用宽基组合降低单一 QQQ 波动。", "Implementation": "每月最后一个交易日生成再平衡信号，下一个交易日调回固定权重：`QQQ` 80.00% / `SPY` 20.00%。", "Strategy Type": "static_allocation", "Mode": "rebalanced", "Rebalance Frequency": "monthly"}, {"Strategy": "qqq_70_spy_20_shy_10", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, SHY, SPY", "Total Return": 7.756232400465338, "CAGR": 0.08619621354687279, "Max Drawdown": -0.733221318218821, "Volatility": 0.2199543893220374, "Sharpe": 0.48574014328048265, "Calmar": 0.11755824797383835, "Final Equity": 8502301.660851844, "Total Invested": 971000.0, "1Y Total Return": 0.32872837344043004, "1Y CAGR": 0.3317530455239748, "1Y MaxDD": -0.10009743599861409, "1Y Volatility": 0.14513122863619388, "1Y Sharpe": 2.04755339821466, "1Y Calmar": 3.3143011328338927, "3Y Total Return": 0.8740451649631795, "3Y CAGR": 0.23461643852812242, "3Y MaxDD": -0.1976004336244802, "3Y Volatility": 0.16901086152528383, "3Y Sharpe": 1.3315880287127868, "3Y Calmar": 1.1873275489566355, "5Y Total Return": 1.032388385803631, "5Y CAGR": 0.15304634788128846, "5Y MaxDD": -0.30198454955390275, "5Y Volatility": 0.19077650899207343, "5Y Sharpe": 0.8418441276028363, "5Y Calmar": 0.5068019145594416, "7Y Total Return": 2.485085201221182, "7Y CAGR": 0.1959786378748689, "7Y MaxDD": -0.30198454955390275, "7Y Volatility": 0.20730516150901174, "7Y Sharpe": 0.9673913748004285, "7Y Calmar": 0.6489690885324174, "10Y Total Return": 4.625799031751125, "10Y CAGR": 0.18912466213558865, "10Y MaxDD": -0.30198454955390275, "10Y Volatility": 0.19001075203128343, "10Y Sharpe": 1.0070859375363703, "10Y Calmar": 0.6262726434679097, "Tags": ["静态配置", "无杠杆"], "Description": "每月再平衡到 70% QQQ / 20% SPY / 10% SHY，增加短债防守仓位。", "Implementation": "每月最后一个交易日生成再平衡信号，下一个交易日调回固定权重：`QQQ` 70.00% / `SPY` 20.00% / `SHY` 10.00%。", "Strategy Type": "static_allocation", "Mode": "rebalanced", "Rebalance Frequency": "monthly"}, {"Strategy": "trend_200dma", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, SHY, SPY", "Total Return": 7.915378945580793, "CAGR": 0.1057889389415474, "Max Drawdown": -0.44770334905050657, "Volatility": 0.17399741753607054, "Sharpe": 0.6651495666794706, "Calmar": 0.2362924895824558, "Final Equity": 8656832.956158949, "Total Invested": 971000.0, "1Y Total Return": 0.27564211870334043, "1Y CAGR": 0.2781289768835733, "1Y MaxDD": -0.11160916727475867, "1Y Volatility": 0.15693981157064615, "1Y Sharpe": 1.6427498965177652, "1Y Calmar": 2.4919904312060437, "3Y Total Return": 0.7607715836623663, "3Y CAGR": 0.20905563802215377, "3Y MaxDD": -0.16631659128309018, "3Y Volatility": 0.16587852469454234, "3Y Sharpe": 1.2278462454738872, "3Y Calmar": 1.2569740421526363, "5Y Total Return": 1.1031831682975533, "5Y CAGR": 0.1610012627151376, "5Y MaxDD": -0.22138002124120815, "5Y Volatility": 0.16308484327926318, "5Y Sharpe": 0.9971857018731214, "5Y Calmar": 0.7272619354377787, "7Y Total Return": 2.53067073872861, "7Y CAGR": 0.19820860456587108, "7Y MaxDD": -0.29076698810623847, "7Y Volatility": 0.19767725351516344, "7Y Sharpe": 1.0144213771020882, "7Y Calmar": 0.681675061728297, "10Y Total Return": 4.9891648317342066, "10Y CAGR": 0.19661147475846197, "10Y MaxDD": -0.29076698810623847, "10Y Volatility": 0.182544414033537, "10Y Sharpe": 1.075356016438032, "10Y Calmar": 0.6761822448930324, "Tags": ["趋势", "无杠杆"], "Description": "使用 QQQ 200 日均线做风险开关，趋势弱时提高 SHY 防守比例。", "Implementation": "用 `QQQ` 的 200 日均线判断趋势；价格在均线之上使用风险开启权重：`QQQ` 80.00% / `SPY` 20.00%；否则使用风险关闭权重：`QQQ` 30.00% / `SPY` 20.00% / `SHY` 50.00%。", "Strategy Type": "trend_200dma", "Mode": "rebalanced", "Rebalance Frequency": "monthly"}, {"Strategy": "core_trend", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, SHY", "Total Return": 9.77322375462447, "CAGR": 0.10545109986753287, "Max Drawdown": -0.6251877716168093, "Volatility": 0.20296835723686613, "Sharpe": 0.5955403473116587, "Calmar": 0.16867108516026136, "Final Equity": 10460800.26574036, "Total Invested": 971000.0, "1Y Total Return": 0.32465612919363984, "1Y CAGR": 0.3276389297325961, "1Y MaxDD": -0.11964439175353225, "1Y Volatility": 0.16962264997967116, "1Y Sharpe": 1.756391006456151, "1Y Calmar": 2.738439511711783, "3Y Total Return": 0.8623649389395713, "3Y CAGR": 0.23202902824007632, "3Y MaxDD": -0.18527290095374527, "3Y Volatility": 0.1807473455567449, "3Y Sharpe": 1.2452684730587062, "3Y Calmar": 1.2523635515266427, "5Y Total Return": 1.1977983925945317, "5Y CAGR": 0.17130519791407717, "5Y MaxDD": -0.26682876423943624, "5Y Volatility": 0.18354466894328586, "5Y Sharpe": 0.9534883959880809, "5Y Calmar": 0.6420042396941811, "7Y Total Return": 2.909304724447232, "7Y CAGR": 0.21583414157628034, "7Y MaxDD": -0.2855940037478797, "7Y Volatility": 0.2139365810841081, "7Y Sharpe": 1.0212604576118132, "7Y Calmar": 0.7557376511546691, "10Y Total Return": 5.8565515149031055, "10Y CAGR": 0.21295160324446938, "10Y MaxDD": -0.2855940037478797, "10Y Volatility": 0.19787506082958434, "10Y Sharpe": 1.0753689068629704, "10Y Calmar": 0.7456445179166349, "Tags": ["趋势", "无杠杆"], "Description": "保留 QQQ 核心仓，再用一部分仓位跟随 200 日趋势在 QQQ 和 SHY 间切换。", "Implementation": "固定保留 `QQQ` 核心仓 60.00%；剩余 40.00% 用 `QQQ` 的 200 日均线切换：趋势强买 `QQQ`，趋势弱买 `SHY`。", "Strategy Type": "core_trend", "Mode": "rebalanced", "Rebalance Frequency": "monthly"}, {"Strategy": "drawdown_buy", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, SHY, SPY", "Total Return": 8.748354939729357, "CAGR": 0.08139797804819349, "Max Drawdown": -0.8128488974723432, "Volatility": 0.25302793760168274, "Sharpe": 0.43554348171331037, "Calmar": 0.10013912585882914, "Final Equity": 9465652.646477206, "Total Invested": 971000.0, "1Y Total Return": 0.3287283578379585, "1Y CAGR": 0.3317530297608824, "1Y MaxDD": -0.10009743583415165, "1Y Volatility": 0.14513122948966684, "1Y Sharpe": 2.0475533053844557, "1Y Calmar": 3.3143009808018835, "3Y Total Return": 0.8921393002026952, "3Y CAGR": 0.23860358846787189, "3Y MaxDD": -0.20336686921993508, "3Y Volatility": 0.17290138994117032, "3Y Sharpe": 1.3240189177344055, "3Y Calmar": 1.173266763574107, "5Y Total Return": 1.0618014066379526, "5Y CAGR": 0.15637784433774238, "5Y MaxDD": -0.32504173697465977, "5Y Volatility": 0.204937866394816, "5Y Sharpe": 0.8113600027928984, "5Y Calmar": 0.48110081429306906, "7Y Total Return": 2.558536053394237, "7Y CAGR": 0.19955961084153762, "7Y MaxDD": -0.32504173697465977, "7Y Volatility": 0.21960002268583323, "7Y Sharpe": 0.9387942200430245, "7Y Calmar": 0.6139507273710368, "10Y Total Return": 4.765103243814442, "10Y CAGR": 0.19204495186312776, "10Y MaxDD": -0.32504173697465977, "10Y Volatility": 0.19959582096285586, "10Y Sharpe": 0.9803676347748986, "10Y Calmar": 0.5908316687284365, "Tags": ["回撤", "无杠杆"], "Description": "根据 QQQ 相对历史高点的回撤深度逐步提高进攻资产配置。", "Implementation": "计算 `QQQ` 相对历史高点的回撤，回撤越深越提高进攻资产权重；规则为 回撤 < 10.00% 时 `QQQ` 70.00% / `SPY` 20.00% / `SHY` 10.00%；回撤 < 20.00% 时 `QQQ` 80.00% / `SPY` 15.00% / `SHY` 5.00%；回撤 < 30.00% 时 `QQQ` 90.00% / `SPY` 10.00%；回撤 < 100.00% 时 `QQQ` 100.00%。", "Strategy Type": "drawdown_buy", "Mode": "rebalanced", "Rebalance Frequency": "monthly"}, {"Strategy": "momentum_rotation", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "GLD, QQQ, SHY, SMH, SPY, XLK", "Total Return": 7.298244672367378, "CAGR": 0.1133995505901888, "Max Drawdown": -0.32084226770270763, "Volatility": 0.17869003716353593, "Sharpe": 0.6907994932681307, "Calmar": 0.35344330222495746, "Final Equity": 8057595.576868724, "Total Invested": 971000.0, "1Y Total Return": 0.6784712704892188, "1Y CAGR": 0.685439715440247, "1Y MaxDD": -0.14679856343785957, "1Y Volatility": 0.2611471018843727, "1Y Sharpe": 2.13214346429383, "1Y Calmar": 4.66925356344101, "3Y Total Return": 1.5298266369964586, "3Y CAGR": 0.36539450749178726, "3Y MaxDD": -0.19312416680851652, "3Y Volatility": 0.22485675808370245, "3Y Sharpe": 1.498682336884471, "3Y Calmar": 1.8920185574396682, "5Y Total Return": 1.5327501879332726, "5Y CAGR": 0.20514709652139618, "5Y MaxDD": -0.31594423764182844, "5Y Volatility": 0.2077326094964984, "5Y Sharpe": 1.0027055282359727, "5Y Calmar": 0.649314252580109, "7Y Total Return": 2.936365188533699, "7Y CAGR": 0.2170369810403574, "7Y MaxDD": -0.32084226770270763, "7Y Volatility": 0.23817470978237862, "7Y Sharpe": 0.9448474063679416, "7Y Calmar": 0.676460064300081, "10Y Total Return": 4.874439225193619, "10Y CAGR": 0.19429286652546995, "10Y MaxDD": -0.32084226770270763, "10Y Volatility": 0.21714661729129817, "10Y Sharpe": 0.927192224433223, "10Y Calmar": 0.6055712918271158, "Tags": ["动量", "无杠杆"], "Description": "在 QQQ、SPY、XLK、SMH、GLD、SHY 中筛选趋势和 6 个月动量最强资产。", "Implementation": "候选资产为 QQQ, SPY, XLK, SMH, GLD, SHY；先剔除低于 200 日均线的资产，再按过去 6 个月收益排序，等权持有前 2 名；若没有资产通过过滤，则持有 `SHY`。", "Strategy Type": "momentum_rotation", "Mode": "rebalanced", "Rebalance Frequency": "monthly"}, {"Strategy": "dca_drawdown_boost", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, SHY, SPY", "Total Return": 11.28984509959106, "CAGR": 0.09478443748674992, "Max Drawdown": -0.7754489879732098, "Volatility": 0.2485736155763574, "Sharpe": 0.4884791666394238, "Calmar": 0.1222316863608113, "Final Equity": 11933439.59170292, "Total Invested": 971000.0, "1Y Total Return": 0.39381470148514097, "1Y CAGR": 0.397522090057159, "1Y MaxDD": -0.1181141403948851, "1Y Volatility": 0.17213482406149638, "1Y Sharpe": 2.031568704295677, "1Y Calmar": 3.365575778887636, "3Y Total Return": 1.0321952128729612, "3Y CAGR": 0.268640575920682, "3Y MaxDD": -0.22572784904004994, "3Y Volatility": 0.1980067310312032, "3Y Sharpe": 1.3007020728209202, "3Y Calmar": 1.190108252318562, "5Y Total Return": 1.2236990543889092, "5Y CAGR": 0.17406396016376746, "5Y MaxDD": -0.34668091086388075, "5Y Volatility": 0.2232301719113356, "5Y Sharpe": 0.8304359306332644, "5Y Calmar": 0.5020869471296363, "7Y Total Return": 3.161170815649534, "7Y CAGR": 0.22676470503910862, "7Y MaxDD": -0.34668091086388075, "7Y Volatility": 0.24080786120411543, "7Y Sharpe": 0.9696442484261184, "7Y Calmar": 0.6541020804232988, "10Y Total Return": 6.244450899900298, "10Y CAGR": 0.21966371338248325, "10Y MaxDD": -0.34668091086388075, "10Y Volatility": 0.2213497150677222, "10Y Sharpe": 1.008320076379822, "10Y Calmar": 0.6336192922624777, "Tags": ["定投", "回撤", "无杠杆"], "Description": "月度定投策略，回撤越深，新投入资金越偏向 QQQ。", "Implementation": "首日投入 $20,000.00，之后每月投入 $3,000.00；正常按 `QQQ` 70.00% / `SPY` 20.00% / `SHY` 10.00% 买入，当 `QQQ` 回撤触发阈值时改用：回撤 >= 10.00% 时 `QQQ` 90.00% / `SPY` 10.00%；回撤 >= 20.00% 时 `QQQ` 100.00%；回撤 >= 30.00% 时 `QQQ` 100.00%。", "Strategy Type": "dca", "Mode": "dca", "Rebalance Frequency": "monthly"}, {"Strategy": "daily_trend_2x", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, QQQ_2X, SHY", "Total Return": 37.59096651734291, "CAGR": 0.1827694985773669, "Max Drawdown": -0.46185718995462266, "Volatility": 0.2988588017599271, "Sharpe": 0.7123978853109681, "Calmar": 0.3957272995908626, "Final Equity": 37471828.48833997, "Total Invested": 971000.0, "1Y Total Return": 0.7711400234066161, "1Y CAGR": 0.7792579718411263, "1Y MaxDD": -0.1687979311399136, "1Y Volatility": 0.32891588009880496, "1Y Sharpe": 1.9185659219066555, "1Y Calmar": 4.616513760439477, "3Y Total Return": 2.2143711806858137, "3Y CAGR": 0.4796445134261855, "3Y MaxDD": -0.25782929194012894, "3Y Volatility": 0.33113076335110436, "3Y Sharpe": 1.3503251515903714, "3Y Calmar": 1.860318157866891, "5Y Total Return": 2.7428465928853303, "5Y CAGR": 0.3034582947723954, "5Y MaxDD": -0.46185718995462266, "5Y Volatility": 0.3057243377043703, "5Y Sharpe": 1.0207547069520992, "5Y Calmar": 0.6570392350116062, "7Y Total Return": 9.12143325529454, "7Y CAGR": 0.39346519312209827, "7Y MaxDD": -0.46185718995462266, "7Y Volatility": 0.35953334629948763, "7Y Sharpe": 1.105299516288057, "7Y Calmar": 0.8519196012965742, "10Y Total Return": 20.68765738500866, "10Y CAGR": 0.36142420726165425, "10Y MaxDD": -0.46185718995462266, "10Y Volatility": 0.3392641585668942, "10Y Sharpe": 1.0815275811690428, "10Y Calmar": 0.7825453735973322, "Tags": ["趋势", "杠杆"], "Description": "每日趋势检查，牛市持有合成 2x QQQ，弱势切到防守资产。", "Implementation": "每日检查 `QQQ` 是否高于 200 日均线；满足则持有 `QQQ_2X`，否则切到 `SHY`。", "Strategy Type": "daily_trend_2x", "Mode": "rebalanced", "Rebalance Frequency": "daily"}, {"Strategy": "daily_trend_3x_defensive", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, QQQ_2X, QQQ_3X, SHY", "Total Return": 92.95807027906685, "CAGR": 0.22220099557174522, "Max Drawdown": -0.5396578851611694, "Volatility": 0.39901735117196163, "Sharpe": 0.7045751023818382, "Calmar": 0.4117441840127744, "Final Equity": 91233286.2409739, "Total Invested": 971000.0, "1Y Total Return": 1.1469318522113774, "1Y CAGR": 1.1600947698777517, "1Y MaxDD": -0.27597250655869654, "1Y Volatility": 0.4585087399523315, "1Y Sharpe": 1.9128807729091357, "1Y Calmar": 4.203660662954523, "3Y Total Return": 3.490451288608532, "3Y CAGR": 0.6553033718616625, "3Y MaxDD": -0.32902003961592186, "3Y Volatility": 0.44767722452205766, "3Y Sharpe": 1.3522364766388373, "3Y Calmar": 1.9916822471562041, "5Y Total Return": 5.014379659411654, "5Y CAGR": 0.43370248209660267, "5Y MaxDD": -0.5396578851611694, "5Y Volatility": 0.41477320737260387, "5Y Sharpe": 1.0775700625464604, "5Y Calmar": 0.8036619014045852, "7Y Total Return": 17.99847997536275, "7Y CAGR": 0.5250974094344301, "7Y MaxDD": -0.5396578851611694, "7Y Volatility": 0.4759517032418218, "7Y Sharpe": 1.1286736659613228, "7Y Calmar": 0.9730190623965573, "10Y Total Return": 51.4260380138034, "10Y CAGR": 0.48742023806847756, "10Y MaxDD": -0.5396578851611694, "10Y Volatility": 0.447531627527929, "10Y Sharpe": 1.114740738927683, "10Y Calmar": 0.9032022906936845, "Tags": ["趋势", "防守", "杠杆"], "Description": "每日 50/200 日均线判断，强趋势用 3x，普通牛市用 2x，弱势防守。", "Implementation": "每日比较 `QQQ` 的 50 日和 200 日均线；强趋势用 `QQQ_3X`，普通趋势用 `QQQ_2X`，弱势用 `SHY`。", "Strategy Type": "daily_trend_3x_defensive", "Mode": "rebalanced", "Rebalance Frequency": "daily"}, {"Strategy": "dual_ma_leverage_ladder", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, QQQ_2X, QQQ_3X, SHY", "Total Return": 19.95374473894054, "CAGR": 0.1431282800776299, "Max Drawdown": -0.5384862156145713, "Volatility": 0.31929636050142357, "Sharpe": 0.5804022424279056, "Calmar": 0.26579748176892215, "Final Equity": 20346086.141511265, "Total Invested": 971000.0, "1Y Total Return": 0.8325905519740868, "1Y CAGR": 0.8414925523368917, "1Y MaxDD": -0.2720726425149207, "1Y Volatility": 0.40071112873851134, "1Y Sharpe": 1.7285887694761901, "1Y Calmar": 3.0928966049599915, "3Y Total Return": 1.9941045610354662, "3Y CAGR": 0.44481624491847893, "3Y MaxDD": -0.2720726425149207, "3Y Volatility": 0.3788101438390762, "3Y Sharpe": 1.1635272350441972, "3Y Calmar": 1.634917207429574, "5Y Total Return": 3.2890976008493222, "5Y CAGR": 0.33960593516794013, "5Y MaxDD": -0.39938602717711247, "5Y Volatility": 0.3437319508069016, "5Y Sharpe": 1.0241726207681603, "5Y Calmar": 0.8503200213795609, "7Y Total Return": 9.640059833947653, "7Y CAGR": 0.403482493636415, "7Y MaxDD": -0.39938602717711247, "7Y Volatility": 0.39076696324918875, "7Y Sharpe": 1.0660401789271745, "7Y Calmar": 1.0102569098079284, "10Y Total Return": 20.506964364011303, "10Y CAGR": 0.3602824768125965, "10Y MaxDD": -0.39938602717711247, "10Y Volatility": 0.36612818028703803, "10Y Sharpe": 1.0264566557781314, "10Y Calmar": 0.9020908401806079, "Tags": ["趋势", "杠杆"], "Description": "用 20/50/200 日均线做杠杆阶梯，趋势越强杠杆越高。", "Implementation": "每日用 20 / 50 / 200 日均线给趋势分层；强趋势用 `QQQ_3X`，中等趋势用 `QQQ_2X` 或 `QQQ`，长期趋势破坏时用 `SHY`。", "Strategy Type": "dual_ma_leverage_ladder", "Mode": "rebalanced", "Rebalance Frequency": "daily"}, {"Strategy": "vol_target_trend", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, QQQ_2X, QQQ_3X, SHY", "Total Return": 66.96620243917627, "CAGR": 0.21220249802093782, "Max Drawdown": -0.5848231612364361, "Volatility": 0.3629047394735502, "Sharpe": 0.713676887185256, "Calmar": 0.36284899793007214, "Final Equity": 65995182.56844016, "Total Invested": 971000.0, "1Y Total Return": 1.0251576676995584, "1Y CAGR": 1.0366223779363586, "1Y MaxDD": -0.2358500175970163, "1Y Volatility": 0.44528496642785675, "1Y Sharpe": 1.8246091193282115, "1Y Calmar": 4.395260973469916, "3Y Total Return": 2.187720550198753, "3Y CAGR": 0.47551660941405904, "3Y MaxDD": -0.32902004305912913, "3Y Volatility": 0.4388799244689097, "3Y Sharpe": 1.1087044901708434, "3Y Calmar": 1.4452511919725286, "5Y Total Return": 4.072622682694233, "5Y CAGR": 0.38550612540970297, "5Y MaxDD": -0.41864568936340074, "5Y Volatility": 0.39461975584654174, "5Y Sharpe": 1.02547067901097, "5Y Calmar": 0.9208410242940986, "7Y Total Return": 12.472450304270621, "7Y CAGR": 0.451777942966997, "7Y MaxDD": -0.41864568936340074, "7Y Volatility": 0.41614976880226684, "7Y Sharpe": 1.1071073389760961, "7Y Calmar": 1.07914151380366, "10Y Total Return": 32.969380626235285, "10Y CAGR": 0.42408282804876074, "10Y MaxDD": -0.41864568936340074, "10Y Volatility": 0.40359315743782415, "10Y Sharpe": 1.0811250728102324, "10Y Calmar": 1.0129874469593316, "Tags": ["趋势", "杠杆"], "Description": "先用 200 日趋势过滤，再根据近 20 日波动率在 1x/2x/3x 间切换。", "Implementation": "每日先要求 `QQQ` 高于 200 日均线；趋势有效后按近 20 日年化波动率调杠杆：低于 18.00% 用 `QQQ_3X`，高于 28.00% 降到 `QQQ`，中间用 `QQQ_2X`。", "Strategy Type": "vol_target_trend", "Mode": "rebalanced", "Rebalance Frequency": "daily"}, {"Strategy": "core_trend_2x", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, QQQ_2X, QQQ_3X, SHY", "Total Return": 35.500566091029576, "CAGR": 0.1637440168205253, "Max Drawdown": -0.5898085723686541, "Volatility": 0.2910334797826686, "Sharpe": 0.6674446224815261, "Calmar": 0.27762230745974764, "Final Equity": 35442049.67438972, "Total Invested": 971000.0, "1Y Total Return": 0.7520240988344966, "1Y CAGR": 0.7599016405580556, "1Y MaxDD": -0.1900780383212246, "1Y Volatility": 0.31201451141911396, "1Y Sharpe": 1.9699962793177968, "1Y Calmar": 3.997840293752669, "3Y Total Return": 2.047616309113991, "3Y CAGR": 0.4534300383157528, "3Y MaxDD": -0.23683071266635225, "3Y Volatility": 0.31027192554621524, "3Y Sharpe": 1.361687136609888, "3Y Calmar": 1.9145744790057964, "5Y Total Return": 2.8811715662856296, "5Y CAGR": 0.31299133895912923, "5Y MaxDD": -0.40594455137369445, "5Y Volatility": 0.2921754357706817, "5Y Sharpe": 1.0789470607361415, "5Y Calmar": 0.7710199284606319, "7Y Total Return": 8.87722665117229, "7Y CAGR": 0.38859522765832244, "7Y MaxDD": -0.40594455137369445, "7Y Volatility": 0.335128691103756, "7Y Sharpe": 1.1491895773922938, "7Y Calmar": 0.9572618387002293, "10Y Total Return": 20.193100971648793, "10Y CAGR": 0.35827861846716047, "10Y MaxDD": -0.40594455137369445, "10Y Volatility": 0.31457398807745524, "10Y Sharpe": 1.1326624783751684, "10Y Calmar": 0.8825801879955402, "Tags": ["趋势", "杠杆"], "Description": "保留 QQQ 核心仓，战术仓按趋势使用 2x、3x 或 SHY。", "Implementation": "每日保留 `QQQ` 核心仓 50.00%；战术仓 50.00% 根据 50 / 200 日趋势在 `QQQ_3X`、`QQQ_2X` 和 `SHY` 间切换。", "Strategy Type": "core_trend_2x", "Mode": "rebalanced", "Rebalance Frequency": "daily"}, {"Strategy": "momentum_rotation_2x", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "GLD, QQQ, QQQ_2X, SHY, SMH, SMH_2X, SPY, SPY_2X, XLK, XLK_2X", "Total Return": 45.14649738953328, "CAGR": 0.1640093407715455, "Max Drawdown": -0.683478030962506, "Volatility": 0.3165956119711491, "Sharpe": 0.639169167018643, "Calmar": 0.23996285665624073, "Final Equity": 44808248.96523681, "Total Invested": 971000.0, "1Y Total Return": 2.040673292992946, "1Y CAGR": 2.067845735939825, "1Y MaxDD": -0.20627628712092083, "1Y Volatility": 0.4696514614435806, "1Y Sharpe": 2.6288477910761534, "1Y Calmar": 10.02464105206449, "3Y Total Return": 4.044290433515518, "3Y CAGR": 0.7211804043187751, "3Y MaxDD": -0.3064315284810478, "3Y Volatility": 0.4087481454474555, "3Y Sharpe": 1.5353424188452376, "3Y Calmar": 2.3534797737478197, "5Y Total Return": 3.545212472280901, "5Y CAGR": 0.35529796275192616, "5Y MaxDD": -0.6064085709050799, "5Y Volatility": 0.3755204098738902, "5Y Sharpe": 0.9984520785074411, "5Y Calmar": 0.585905245734959, "7Y Total Return": 10.189675647350967, "7Y CAGR": 0.41365176571435813, "7Y MaxDD": -0.6064085709050799, "7Y Volatility": 0.4005545146638932, "7Y Sharpe": 1.0668958212186066, "7Y Calmar": 0.6821337717852051, "10Y Total Return": 23.982301795760822, "10Y CAGR": 0.38086924717315296, "10Y MaxDD": -0.6064085709050799, "10Y Volatility": 0.3757164600186311, "10Y Sharpe": 1.0490809505923075, "10Y Calmar": 0.6280736543757884, "Tags": ["动量", "杠杆"], "Description": "动量轮动增强版，进攻资产使用合成 2x，防守资产不加杠杆。", "Implementation": "每日在 QQQ, SPY, XLK, SMH, GLD, SHY 中做 200 日趋势过滤和 6 个月动量排名，持有前 2 名；进攻资产映射到杠杆版本 QQQ->QQQ_2X, SPY->SPY_2X, XLK->XLK_2X, SMH->SMH_2X，无合格资产时持有 `SHY`。", "Strategy Type": "momentum_rotation_2x", "Mode": "rebalanced", "Rebalance Frequency": "daily"}, {"Strategy": "breakout_3x_with_stop", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, QQQ_2X, QQQ_3X, SHY", "Total Return": 30.023455677864273, "CAGR": 0.15732228915184288, "Max Drawdown": -0.5473228691351848, "Volatility": 0.34751626915620726, "Sharpe": 0.596058629776266, "Calmar": 0.28743964124946036, "Final Equity": 30123775.46320621, "Total Invested": 971000.0, "1Y Total Return": 1.0126489161563557, "1Y CAGR": 1.023942489947785, "1Y MaxDD": -0.29328458294697, "1Y Volatility": 0.43055610990623616, "1Y Sharpe": 1.8569919593680075, "1Y Calmar": 3.491293267648263, "3Y Total Return": 2.6178548064526947, "3Y CAGR": 0.5395355715848624, "3Y MaxDD": -0.29328458294697, "3Y Volatility": 0.41171580090552606, "3Y Sharpe": 1.2564451865102322, "3Y Calmar": 1.8396315488646673, "5Y Total Return": 3.8207982117337354, "5Y CAGR": 0.3714125155669825, "5Y MaxDD": -0.4663609411110843, "5Y Volatility": 0.3738080869208398, "5Y Sharpe": 1.0335645961633175, "5Y Calmar": 0.796405708166959, "7Y Total Return": 12.351129961796458, "7Y CAGR": 0.4498966771484658, "7Y MaxDD": -0.4663609411110843, "7Y Volatility": 0.4150957429369079, "7Y Sharpe": 1.105759168506822, "7Y Calmar": 0.9646963059912499, "10Y Total Return": 30.060932959643775, "10Y CAGR": 0.41135773661327457, "10Y MaxDD": -0.4663609411110843, "10Y Volatility": 0.3913466903986429, "10Y Sharpe": 1.0791835362081474, "10Y Calmar": 0.8820587239429464, "Tags": ["防守", "杠杆"], "Description": "寻找接近 252 日新高的突破行情，趋势转弱时逐级降杠杆。", "Implementation": "每日检查 `QQQ` 是否接近 252 日新高；价格达到新高阈值 95.00% 且均线结构强时用 `QQQ_3X`，趋势转弱时逐级降到 `QQQ_2X`、`QQQ` 或 `SHY`。", "Strategy Type": "breakout_3x_with_stop", "Mode": "rebalanced", "Rebalance Frequency": "daily"}, {"Strategy": "crash_protected_tqqq", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, QQQ_3X, SHY", "Total Return": 106.21799876376743, "CAGR": 0.23199088796339984, "Max Drawdown": -0.6182016334792955, "Volatility": 0.43014078158757424, "Sharpe": 0.7031589342176732, "Calmar": 0.37526734870908357, "Final Equity": 104108676.79961817, "Total Invested": 971000.0, "1Y Total Return": 1.2608584638933706, "1Y CAGR": 1.27566097616605, "1Y MaxDD": -0.2546072439837269, "1Y Volatility": 0.49338894796280414, "1Y Sharpe": 1.9173585738498002, "1Y Calmar": 5.010309039940683, "3Y Total Return": 3.9535926114738444, "3Y CAGR": 0.7107332901646395, "3Y MaxDD": -0.367273579300588, "3Y Volatility": 0.4965661212672854, "3Y Sharpe": 1.332411350807193, "3Y Calmar": 1.9351604096273787, "5Y Total Return": 5.145006297098245, "5Y CAGR": 0.4399014567997963, "5Y MaxDD": -0.5623772724070636, "5Y Volatility": 0.4449526993119728, "5Y Sharpe": 1.0441093622636004, "5Y Calmar": 0.7822177004361299, "7Y Total Return": 21.377258679826674, "7Y CAGR": 0.5613047319753923, "7Y MaxDD": -0.5667642690360197, "7Y Volatility": 0.5304033244856102, "7Y Sharpe": 1.1112891079277358, "7Y Calmar": 0.9903671819857076, "10Y Total Return": 63.022763520504725, "10Y CAGR": 0.5175276011075511, "10Y MaxDD": -0.5667642690360197, "10Y Volatility": 0.50231063318066, "10Y Sharpe": 1.087059563638857, "10Y Calmar": 0.9131267254863954, "Tags": ["趋势", "防守", "杠杆"], "Description": "仅在 QQQ 高于 200 日均线且均线向上时使用合成 3x QQQ。", "Implementation": "每日要求 `QQQ` 高于 200 日均线，且均线在 20 日窗口内向上；满足时用 `QQQ_3X`，否则降到 `QQQ` 或 `SHY`。", "Strategy Type": "crash_protected_tqqq", "Mode": "rebalanced", "Rebalance Frequency": "daily"}, {"Strategy": "adaptive_leverage_score", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, QQQ_2X, QQQ_3X, SHY", "Total Return": 70.32885857425285, "CAGR": 0.22223040347847056, "Max Drawdown": -0.5105816023264312, "Volatility": 0.33936175599746077, "Sharpe": 0.7629927787417871, "Calmar": 0.43524953203541306, "Final Equity": 69260321.67559952, "Total Invested": 971000.0, "1Y Total Return": 1.1380510611576193, "1Y CAGR": 1.1510881976829377, "1Y MaxDD": -0.27834081223152396, "1Y Volatility": 0.48753180986492556, "1Y Sharpe": 1.8190511001410912, "1Y Calmar": 4.135535096180801, "3Y Total Return": 2.442477514656971, "3Y CAGR": 0.5140788598841213, "3Y MaxDD": -0.3885749360096682, "3Y Volatility": 0.4810176352354978, "3Y Sharpe": 1.1056886858795865, "3Y Calmar": 1.3229851239590256, "5Y Total Return": 3.6013443914312013, "5Y CAGR": 0.35864233483316443, "5Y MaxDD": -0.4810714054876022, "5Y Volatility": 0.4207043095190599, "5Y Sharpe": 0.9411484628482149, "5Y Calmar": 0.7455074875415914, "7Y Total Return": 11.929463101613123, "7Y CAGR": 0.44324208033399515, "7Y MaxDD": -0.4810714054876022, "7Y Volatility": 0.4609039265998597, "7Y Sharpe": 1.0302890258493753, "7Y Calmar": 0.9213644279787028, "10Y Total Return": 32.205818414648995, "10Y CAGR": 0.42083993582951984, "10Y MaxDD": -0.4810714054876022, "10Y Volatility": 0.44250775672364145, "10Y Sharpe": 1.0186772180117474, "10Y Calmar": 0.8747972359798994, "Tags": ["趋势", "杠杆"], "Description": "综合趋势、动量、回撤和波动率打分，动态决定 1x/2x/3x 或防守。", "Implementation": "每日综合 `QQQ` 的均线结构、6 个月动量、回撤和近 20 日波动率打分；高分用 `QQQ_3X`，中高分用 `QQQ_2X`，中性用 `QQQ`，低分用 `SHY`。", "Strategy Type": "adaptive_leverage_score", "Mode": "rebalanced", "Rebalance Frequency": "daily"}, {"Strategy": "dca_leverage_boost", "Start Date": "2000-01-03", "End Date": "2026-06-15", "Required Assets": "QQQ, QQQ_2X, QQQ_3X, SHY, SPY", "Total Return": 117.11512770603042, "CAGR": 0.20625510841135752, "Max Drawdown": -0.7526070100776112, "Volatility": 0.42436071468679754, "Sharpe": 0.6556451677371978, "Calmar": 0.2740541951503851, "Final Equity": 114689789.00255553, "Total Invested": 971000.0, "1Y Total Return": 1.3472586259836175, "1Y CAGR": 1.3633357865839626, "1Y MaxDD": -0.31860625320773006, "1Y Volatility": 0.4835561874103659, "1Y Sharpe": 2.024002400538109, "1Y Calmar": 4.279061609299529, "3Y Total Return": 4.262807840109077, "3Y CAGR": 0.7458479172964216, "3Y MaxDD": -0.5262736361193264, "3Y Volatility": 0.5443454805865228, "3Y Sharpe": 1.2948638390300768, "3Y Calmar": 1.4172245503236824, "5Y Total Return": 3.8150849575548778, "5Y CAGR": 0.3710860064696815, "5Y MaxDD": -0.7526070100776112, "5Y Volatility": 0.6022760333574361, "5Y Sharpe": 0.8251510882672037, "5Y Calmar": 0.49306743293742894, "7Y Total Return": 16.08032008585341, "7Y CAGR": 0.5020063969492643, "7Y MaxDD": -0.7526070100776112, "7Y Volatility": 0.639905195327857, "7Y Sharpe": 0.9593547246528327, "7Y Calmar": 0.6670232807125936, "10Y Total Return": 52.747070645153194, "10Y CAGR": 0.49113674686212017, "10Y MaxDD": -0.7526070100776112, "10Y Volatility": 0.5814598983630234, "10Y Sharpe": 0.9812191219273835, "10Y Calmar": 0.6525806168234768, "Tags": ["定投", "杠杆"], "Description": "只调整每月新增资金，强牛市买 3x，普通牛市买 2x，熊市转防守组合。", "Implementation": "首日投入 $20,000.00，之后每月投入 $3,000.00；只调整新增资金：普通状态 `QQQ` 70.00% / `SPY` 20.00% / `SHY` 10.00%，牛市 `QQQ_2X` 80.00% / `SPY` 20.00%，强牛市 `QQQ_3X` 80.00% / `SPY` 20.00%，熊市 `QQQ` 40.00% / `SHY` 60.00%。", "Strategy Type": "dca_leverage_boost", "Mode": "dca", "Rebalance Frequency": "monthly"}];
+
+    const state = {
+      filter: "all",
+      search: "",
+      minCagr: 0,
+      maxDrawdown: 0.9,
+      beatQqq: false,
+      betterDd: false,
+      sortKey: "CAGR",
+      sortDir: "desc",
+      chartMetric: "CAGR",
+      selected: null,
+      imageIndex: 0,
+      chartVisibility: {
+        rank: true,
+        scatter: true,
+        heatmap: true,
+        images: true
+      }
+    };
+
+    const chartOptions = [
+      ["rank", "排行图"],
+      ["scatter", "散点图"],
+      ["heatmap", "热力图"],
+      ["images", "原始图"]
+    ];
+
+    const filterOptions = [
+      ["all", "全部"],
+      ["基准", "基准"],
+      ["无杠杆", "无杠杆"],
+      ["杠杆", "杠杆"],
+      ["趋势", "趋势"],
+      ["动量", "动量"],
+      ["定投", "定投"],
+      ["防守", "防守"],
+      ["回撤", "回撤"]
+    ];
+
+    const metricOptions = [
+      ["CAGR", "年化"],
+      ["Final Equity", "终值"],
+      ["Max Drawdown", "回撤"],
+      ["Sharpe", "夏普"],
+      ["Calmar", "Calmar"],
+      ["10Y CAGR", "10 年"]
+    ];
+
+    const columns = [
+      ["Strategy", "策略", "text"],
+      ["Final Equity", "最终净值", "money"],
+      ["Total Return", "总收益", "pct"],
+      ["CAGR", "年化", "pct"],
+      ["Max Drawdown", "最大回撤", "pct"],
+      ["Volatility", "波动率", "pct"],
+      ["Sharpe", "夏普", "num"],
+      ["Calmar", "Calmar", "num"],
+      ["1Y CAGR", "1 年", "pct"],
+      ["3Y CAGR", "3 年", "pct"],
+      ["5Y CAGR", "5 年", "pct"],
+      ["10Y CAGR", "10 年", "pct"],
+      ["Required Assets", "资产", "text"]
+    ];
+
+    const benchmark = REPORT_ROWS.find(row => row.Strategy === "qqq_buy_hold") || REPORT_ROWS[0];
+
+    function fmtPct(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
+      return `${(Number(value) * 100).toFixed(2)}%`;
+    }
+
+    function fmtMoney(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
+      return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value));
+    }
+
+    function fmtNum(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
+      return Number(value).toFixed(2);
+    }
+
+    function fmtMetric(value, type) {
+      if (type === "money") return fmtMoney(value);
+      if (type === "pct") return fmtPct(value);
+      if (type === "num") return fmtNum(value);
+      return value ?? "N/A";
+    }
+
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[char]));
+    }
+
+    function compactName(value) {
+      return String(value).replaceAll("_", " ");
+    }
+
+    function metricFormatFor(key) {
+      if (key.includes("Return") || key.includes("CAGR") || key.includes("Drawdown") || key.includes("MaxDD") || key === "Volatility") return "pct";
+      if (key.includes("Equity") || key.includes("Invested")) return "money";
+      return "num";
+    }
+
+    function getFilteredRows() {
+      const query = state.search.trim().toLowerCase();
+      const rows = REPORT_ROWS.filter(row => {
+        const tags = row.Tags || [];
+        const text = `${row.Strategy} ${row["Required Assets"]} ${tags.join(" ")}`.toLowerCase();
+        if (state.filter !== "all" && !tags.includes(state.filter)) return false;
+        if (query && !text.includes(query)) return false;
+        if ((row.CAGR ?? -Infinity) < state.minCagr) return false;
+        if (Math.abs(row["Max Drawdown"] ?? 0) > state.maxDrawdown) return false;
+        if (state.beatQqq && benchmark && row.CAGR <= benchmark.CAGR) return false;
+        if (state.betterDd && benchmark && row["Max Drawdown"] <= benchmark["Max Drawdown"]) return false;
+        return true;
+      });
+
+      rows.sort((a, b) => {
+        const av = a[state.sortKey];
+        const bv = b[state.sortKey];
+        if (typeof av === "string" || typeof bv === "string") {
+          return state.sortDir === "asc"
+            ? String(av).localeCompare(String(bv))
+            : String(bv).localeCompare(String(av));
+        }
+        const an = Number(av ?? (state.sortDir === "asc" ? Infinity : -Infinity));
+        const bn = Number(bv ?? (state.sortDir === "asc" ? Infinity : -Infinity));
+        return state.sortDir === "asc" ? an - bn : bn - an;
+      });
+      return rows;
+    }
+
+    function renderMeta() {
+      document.getElementById("reportTitle").textContent = `${REPORT_META.title} · ${REPORT_META.subtitle}`;
+      document.getElementById("metaLine").innerHTML = [
+        `区间 ${REPORT_META.startDate} 至 ${REPORT_META.endDate}`,
+        `${REPORT_META.strategyCount} 个策略`,
+        `初始资金 ${fmtMoney(REPORT_META.initialCapital)}`,
+        `每月追加 ${fmtMoney(REPORT_META.monthlyContribution)}`,
+        `总投入 ${fmtMoney(REPORT_META.totalInvested)}`,
+        `交易成本 ${fmtPct(REPORT_META.transactionCost)}`,
+        `生成 ${REPORT_META.generatedAt}`
+      ].map(item => `<span class="meta-pill">${esc(item)}</span>`).join("");
+    }
+
+    function renderRunCommand() {
+      const start = document.getElementById("paramStart").value || REPORT_META.startDate;
+      const end = document.getElementById("paramEnd").value || REPORT_META.endDate;
+      const initial = Number(document.getElementById("paramInitial").value || REPORT_META.initialCapital || 0);
+      const monthly = Number(document.getElementById("paramMonthly").value || REPORT_META.monthlyContribution || 0);
+      const cost = Number(REPORT_META.transactionCost ?? 0.0005);
+      const command = [
+        ".\\.venv\\Scripts\\python.exe -m src.main",
+        `--start ${start}`,
+        `--end ${end}`,
+        `--initial-capital ${initial}`,
+        `--monthly-contribution ${monthly}`,
+        `--transaction-cost ${cost}`
+      ].join(" ");
+      document.getElementById("runCommand").textContent = command;
+    }
+
+    function renderRunForm() {
+      document.getElementById("paramStart").value = REPORT_META.startDate || "";
+      document.getElementById("paramEnd").value = REPORT_META.endDate || "";
+      document.getElementById("paramInitial").value = Math.round(Number(REPORT_META.initialCapital || 0));
+      document.getElementById("paramMonthly").value = Math.round(Number(REPORT_META.monthlyContribution || 0));
+      renderRunCommand();
+    }
+
+    async function copyRunCommand() {
+      const text = document.getElementById("runCommand").textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (error) {
+        const area = document.createElement("textarea");
+        area.value = text;
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand("copy");
+        area.remove();
+      }
+    }
+
+    function renderControls() {
+      const filterHost = document.getElementById("filterChips");
+      filterHost.innerHTML = filterOptions.map(([value, label]) => (
+        `<button class="filter-chip ${state.filter === value ? "active" : ""}" type="button" data-filter="${esc(value)}">${esc(label)}</button>`
+      )).join("");
+      filterHost.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => {
+          state.filter = button.dataset.filter;
+          sync();
+        });
+      });
+
+      const chartToggleHost = document.getElementById("chartToggles");
+      chartToggleHost.innerHTML = chartOptions.map(([key, label]) => (
+        `<button class="chart-toggle ${state.chartVisibility[key] ? "" : "off"}" type="button" data-chart-toggle="${esc(key)}">${esc(label)}</button>`
+      )).join("");
+      chartToggleHost.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => {
+          toggleChart(button.dataset.chartToggle);
+        });
+      });
+
+      const metricHost = document.getElementById("metricChips");
+      metricHost.innerHTML = metricOptions.map(([value, label]) => (
+        `<button class="metric-chip ${state.chartMetric === value ? "active" : ""}" type="button" data-metric="${esc(value)}">${esc(label)}</button>`
+      )).join("");
+      metricHost.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => {
+          state.chartMetric = button.dataset.metric;
+          sync();
+        });
+      });
+    }
+
+    function toggleChart(key) {
+      state.chartVisibility[key] = !state.chartVisibility[key];
+      syncChartVisibility();
+      renderControls();
+    }
+
+    function syncChartVisibility() {
+      document.querySelectorAll("[data-chart-panel]").forEach(panel => {
+        const key = panel.dataset.chartPanel;
+        const visible = state.chartVisibility[key] !== false;
+        panel.classList.toggle("is-hidden", !visible);
+      });
+      document.querySelectorAll("button[data-chart-toggle]").forEach(button => {
+        const key = button.dataset.chartToggle;
+        const visible = state.chartVisibility[key] !== false;
+        button.textContent = visible ? "隐藏" : "显示";
+        button.setAttribute("aria-expanded", String(visible));
+        button.setAttribute("title", visible ? "隐藏这个图表" : "显示这个图表");
+      });
+    }
+
+    function renderKpis(rows) {
+      const host = document.getElementById("kpiGrid");
+      if (!rows.length) {
+        host.innerHTML = `<div class="kpi-card"><div class="kpi-label">当前筛选</div><div class="kpi-value">无匹配策略</div><div class="kpi-owner">放宽筛选条件后再看。</div></div>`;
+        return;
+      }
+      const bestFinal = maxBy(rows, "Final Equity");
+      const bestCagr = maxBy(rows, "CAGR");
+      const lowestDd = maxBy(rows, "Max Drawdown");
+      const bestRisk = maxBy(rows, "Calmar");
+      const cards = [
+        ["最终资产最高", fmtMoney(bestFinal["Final Equity"]), bestFinal.Strategy, "Total Return", "good"],
+        ["年化收益最高", fmtPct(bestCagr.CAGR), bestCagr.Strategy, "Sharpe", "good"],
+        ["历史回撤最低", fmtPct(lowestDd["Max Drawdown"]), lowestDd.Strategy, "Volatility", "risk"],
+        ["收益回撤最好", fmtNum(bestRisk.Calmar), bestRisk.Strategy, "Calmar", "good"]
+      ];
+      host.innerHTML = cards.map(([label, value, owner, subKey, tone]) => {
+        const row = rows.find(item => item.Strategy === owner);
+        const type = metricFormatFor(subKey);
+        return `<article class="kpi-card">
+          <div class="kpi-label">${esc(label)}</div>
+          <div class="kpi-value">${esc(value)}</div>
+          <div class="kpi-owner">
+            <span class="strategy-name">${esc(owner)}</span>
+            <span class="delta-pill ${tone}">${esc(subKey)} ${esc(fmtMetric(row?.[subKey], type))}</span>
+          </div>
+        </article>`;
+      }).join("");
+    }
+
+    function maxBy(rows, key) {
+      return rows.reduce((best, row) => {
+        const current = Number(row[key] ?? -Infinity);
+        const previous = Number(best?.[key] ?? -Infinity);
+        return current > previous ? row : best;
+      }, rows[0]);
+    }
+
+    function renderDetail(rows) {
+      const host = document.getElementById("detailPanel");
+      const selected = rows.find(row => row.Strategy === state.selected) || rows[0];
+      if (!selected) {
+        host.innerHTML = `<div class="empty-state">没有可展示的策略。调整左侧筛选条件试试。</div>`;
+        return;
+      }
+      state.selected = selected.Strategy;
+      const qqqCagrDelta = benchmark ? selected.CAGR - benchmark.CAGR : null;
+      const qqqDdDelta = benchmark ? selected["Max Drawdown"] - benchmark["Max Drawdown"] : null;
+      host.innerHTML = `<div class="detail-layout">
+        <div>
+          <h3 class="detail-name">${esc(selected.Strategy)}</h3>
+          <p class="detail-text">${esc(selected.Description)}</p>
+          <div class="tag-row">${(selected.Tags || []).map(tag => `<span class="tag">${esc(tag)}</span>`).join("")}</div>
+          <div class="implementation-box"><strong>实施规则：</strong>${esc(selected.Implementation)}</div>
+        </div>
+        <div class="mini-metrics">
+          <div class="mini-metric"><span>最终净值</span><strong>${fmtMoney(selected["Final Equity"])}</strong></div>
+          <div class="mini-metric"><span>年化收益</span><strong>${fmtPct(selected.CAGR)}</strong></div>
+          <div class="mini-metric"><span>最大回撤</span><strong>${fmtPct(selected["Max Drawdown"])}</strong></div>
+          <div class="mini-metric"><span>相对 QQQ 年化</span><strong>${fmtPct(qqqCagrDelta)}</strong></div>
+          <div class="mini-metric"><span>相对 QQQ 回撤</span><strong>${fmtPct(qqqDdDelta)}</strong></div>
+          <div class="mini-metric"><span>资产需求</span><strong>${esc(selected["Required Assets"])}</strong></div>
+        </div>
+      </div>`;
+    }
+
+    function renderMethodPanel() {
+      const host = document.getElementById("methodPanel");
+      host.innerHTML = REPORT_ROWS.map(row => `<button class="method-item ${row.Strategy === state.selected ? "selected" : ""}" type="button" data-strategy="${esc(row.Strategy)}">
+        <div>
+          <div class="method-name">${esc(row.Strategy)}</div>
+          <div class="method-meta">${esc(row["Rebalance Frequency"] || "monthly")} · ${esc((row.Tags || []).join(" / "))}</div>
+          <div class="method-meta">${esc(row["Required Assets"] || "")}</div>
+        </div>
+        <div class="method-text">${esc(row.Implementation)}</div>
+      </button>`).join("");
+      host.querySelectorAll("[data-strategy]").forEach(button => {
+        button.addEventListener("click", () => {
+          state.selected = button.dataset.strategy;
+          sync();
+          document.getElementById("detailPanel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+      });
+    }
+
+    function renderBarChart(rows) {
+      const host = document.getElementById("barChart");
+      if (!rows.length) {
+        host.innerHTML = `<div class="empty-state">没有数据可画。</div>`;
+        return;
+      }
+      const key = state.chartMetric;
+      const sorted = [...rows].sort((a, b) => {
+        if (key.includes("Drawdown")) return Number(b[key] ?? -Infinity) - Number(a[key] ?? -Infinity);
+        return Number(b[key] ?? -Infinity) - Number(a[key] ?? -Infinity);
+      }).slice(0, 18);
+      const width = 760;
+      const rowH = 34;
+      const top = 22;
+      const left = 210;
+      const right = 82;
+      const height = top + sorted.length * rowH + 22;
+      const values = sorted.map(row => Number(row[key] ?? 0));
+      const min = Math.min(0, ...values);
+      const max = Math.max(...values);
+      const span = Math.max(0.0001, max - min);
+      const axisX = left + (0 - min) / span * (width - left - right);
+      const type = metricFormatFor(key);
+      const bars = sorted.map((row, index) => {
+        const value = Number(row[key] ?? 0);
+        const y = top + index * rowH;
+        const xValue = left + (value - min) / span * (width - left - right);
+        const x = Math.min(axisX, xValue);
+        const barW = Math.max(3, Math.abs(xValue - axisX));
+        const color = value >= 0 ? "var(--accent)" : "var(--red)";
+        const selectedClass = row.Strategy === state.selected ? `stroke="var(--ink)" stroke-width="2"` : "";
+        return `<g role="button" tabindex="0" data-strategy="${esc(row.Strategy)}">
+          <text class="bar-label" x="10" y="${y + 20}">${esc(row.Strategy)}</text>
+          <rect x="${x}" y="${y + 7}" width="${barW}" height="18" rx="5" fill="${color}" ${selectedClass}></rect>
+          <text class="bar-value" x="${Math.max(xValue, axisX) + 8}" y="${y + 21}">${esc(fmtMetric(value, type))}</text>
+        </g>`;
+      }).join("");
+      host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="策略排行图">
+        <line x1="${axisX}" y1="10" x2="${axisX}" y2="${height - 12}" stroke="var(--line)" />
+        ${bars}
+      </svg>`;
+      host.querySelectorAll("[data-strategy]").forEach(group => {
+        group.addEventListener("click", () => {
+          state.selected = group.dataset.strategy;
+          sync();
+        });
+      });
+    }
+
+    function renderScatter(rows) {
+      const host = document.getElementById("scatterChart");
+      if (!rows.length) {
+        host.innerHTML = `<div class="empty-state">没有数据可画。</div>`;
+        return;
+      }
+      const width = 520;
+      const height = 360;
+      const pad = { left: 52, right: 22, top: 28, bottom: 46 };
+      const xs = rows.map(row => Number(row.Volatility ?? 0));
+      const ys = rows.map(row => Number(row.CAGR ?? 0));
+      const minX = Math.max(0, Math.min(...xs) * 0.88);
+      const maxX = Math.max(...xs) * 1.08;
+      const minY = Math.min(0, Math.min(...ys) * 0.9);
+      const maxY = Math.max(...ys) * 1.12;
+      const xScale = value => pad.left + (value - minX) / Math.max(0.0001, maxX - minX) * (width - pad.left - pad.right);
+      const yScale = value => height - pad.bottom - (value - minY) / Math.max(0.0001, maxY - minY) * (height - pad.top - pad.bottom);
+      const points = rows.map(row => {
+        const drawdown = Math.abs(Number(row["Max Drawdown"] ?? 0));
+        const radius = 7 + Math.min(12, Math.max(0, Number(row["Final Equity"] ?? 0) / 12000000));
+        const color = drawdown > 0.65 ? "var(--red)" : drawdown > 0.5 ? "var(--orange)" : "var(--accent)";
+        const selected = row.Strategy === state.selected;
+        return `<g role="button" tabindex="0" data-strategy="${esc(row.Strategy)}">
+          <circle cx="${xScale(Number(row.Volatility ?? 0))}" cy="${yScale(Number(row.CAGR ?? 0))}" r="${selected ? radius + 2 : radius}" fill="${color}" opacity="${selected ? 0.96 : 0.72}" stroke="${selected ? "var(--ink)" : "white"}" stroke-width="${selected ? 2 : 1.5}">
+            <title>${esc(row.Strategy)} · 年化 ${fmtPct(row.CAGR)} · 波动 ${fmtPct(row.Volatility)} · 回撤 ${fmtPct(row["Max Drawdown"])}</title>
+          </circle>
+          ${selected ? `<text class="point-label" x="${xScale(Number(row.Volatility ?? 0)) + 12}" y="${yScale(Number(row.CAGR ?? 0)) - 10}">${esc(row.Strategy)}</text>` : ""}
+        </g>`;
+      }).join("");
+      host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="风险收益散点图">
+        <line x1="${pad.left}" y1="${height - pad.bottom}" x2="${width - pad.right}" y2="${height - pad.bottom}" stroke="var(--line)" />
+        <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${height - pad.bottom}" stroke="var(--line)" />
+        <text class="axis-label" x="${width / 2 - 36}" y="${height - 12}">波动率</text>
+        <text class="axis-label" x="12" y="18">年化收益</text>
+        <text class="axis-label" x="${pad.left - 40}" y="${height - pad.bottom + 4}">${fmtPct(minY)}</text>
+        <text class="axis-label" x="${pad.left - 44}" y="${pad.top + 4}">${fmtPct(maxY)}</text>
+        <text class="axis-label" x="${pad.left - 8}" y="${height - pad.bottom + 22}">${fmtPct(minX)}</text>
+        <text class="axis-label" x="${width - pad.right - 42}" y="${height - pad.bottom + 22}">${fmtPct(maxX)}</text>
+        ${points}
+      </svg>`;
+      host.querySelectorAll("[data-strategy]").forEach(group => {
+        group.addEventListener("click", () => {
+          state.selected = group.dataset.strategy;
+          sync();
+        });
+      });
+    }
+
+    function renderHeatmap(rows) {
+      const host = document.getElementById("heatmap");
+      if (!rows.length) {
+        host.innerHTML = `<div class="empty-state">没有数据可展示。</div>`;
+        return;
+      }
+      const periods = ["1Y CAGR", "3Y CAGR", "5Y CAGR", "7Y CAGR", "10Y CAGR"];
+      const values = rows.flatMap(row => periods.map(period => Number(row[period] ?? 0)));
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const colorFor = value => {
+        const t = (Number(value ?? 0) - min) / Math.max(0.0001, max - min);
+        const light = 94 - t * 28;
+        const sat = 32 + t * 26;
+        return `hsl(158, ${sat}%, ${light}%)`;
+      };
+      const header = `<div class="heat-row">
+        <div class="heat-cell heat-head heat-name">策略</div>
+        ${periods.map(period => `<div class="heat-cell heat-head">${period.replace(" CAGR", "")}</div>`).join("")}
+      </div>`;
+      const body = rows.map(row => `<div class="heat-row">
+        <button class="heat-cell heat-name" type="button" data-strategy="${esc(row.Strategy)}">${esc(row.Strategy)}</button>
+        ${periods.map(period => `<div class="heat-cell" style="background:${colorFor(row[period])}">${fmtPct(row[period])}</div>`).join("")}
+      </div>`).join("");
+      host.innerHTML = header + body;
+      host.querySelectorAll("[data-strategy]").forEach(button => {
+        button.addEventListener("click", () => {
+          state.selected = button.dataset.strategy;
+          sync();
+        });
+      });
+    }
+
+    function renderTable(rows) {
+      const table = document.getElementById("resultsTable");
+      const header = `<thead><tr>${columns.map(([key, label]) => {
+        const mark = state.sortKey === key ? (state.sortDir === "asc" ? " ↑" : " ↓") : "";
+        return `<th class="sortable" data-key="${esc(key)}">${esc(label + mark)}</th>`;
+      }).join("")}</tr></thead>`;
+      const body = rows.map((row, index) => `<tr class="${row.Strategy === state.selected ? "selected" : ""}" data-strategy="${esc(row.Strategy)}">
+        ${columns.map(([key, _label, type], colIndex) => {
+          const raw = row[key];
+          const value = fmtMetric(raw, type);
+          const tone = key.includes("CAGR") || key === "Total Return" ? (Number(raw) >= 0 ? "good" : "bad") : key.includes("Drawdown") || key.includes("MaxDD") ? (Number(raw) > -0.5 ? "good" : "bad") : "";
+          if (colIndex === 0) {
+            return `<td><span class="rank-badge ${index < 3 ? "top" : ""}">${index + 1}</span><span class="strategy-name table-strategy-name" tabindex="0" data-strategy-tooltip="${esc(row.Strategy)}">${esc(value)}</span></td>`;
+          }
+          return `<td class="number ${tone}">${esc(value)}</td>`;
+        }).join("")}
+      </tr>`).join("");
+      table.innerHTML = header + `<tbody>${body}</tbody>`;
+      table.querySelectorAll("th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          const key = th.dataset.key;
+          if (state.sortKey === key) {
+            state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+          } else {
+            state.sortKey = key;
+            state.sortDir = key === "Max Drawdown" || key === "Volatility" ? "asc" : "desc";
+          }
+          document.getElementById("sortSelect").value = `${state.sortKey}:${state.sortDir}`;
+          sync();
+        });
+      });
+      table.querySelectorAll("tbody tr").forEach(row => {
+        row.addEventListener("click", () => {
+          state.selected = row.dataset.strategy;
+          sync();
+        });
+      });
+      bindStrategyTooltips(table);
+    }
+
+    function rowForStrategy(strategyName) {
+      return REPORT_ROWS.find(row => row.Strategy === strategyName);
+    }
+
+    function tooltipHtml(row) {
+      return `<div class="tooltip-title">${esc(row.Strategy)}</div>
+        <div class="tooltip-meta">
+          ${(row.Tags || []).map(tag => `<span class="tooltip-pill">${esc(tag)}</span>`).join("")}
+          <span class="tooltip-pill">${esc(row["Rebalance Frequency"] || "monthly")}</span>
+          <span class="tooltip-pill">${esc(row["Required Assets"] || "N/A")}</span>
+        </div>
+        <p class="tooltip-body"><strong>简介：</strong>${esc(row.Description)}</p>
+        <p class="tooltip-body"><strong>实施：</strong>${esc(row.Implementation)}</p>
+        <div class="tooltip-kpis">
+          <div class="tooltip-kpi"><span>年化</span><strong>${fmtPct(row.CAGR)}</strong></div>
+          <div class="tooltip-kpi"><span>最大回撤</span><strong>${fmtPct(row["Max Drawdown"])}</strong></div>
+          <div class="tooltip-kpi"><span>夏普</span><strong>${fmtNum(row.Sharpe)}</strong></div>
+          <div class="tooltip-kpi"><span>最终净值</span><strong>${fmtMoney(row["Final Equity"])}</strong></div>
+        </div>`;
+    }
+
+    function showStrategyTooltip(strategyName, event) {
+      const row = rowForStrategy(strategyName);
+      const tooltip = document.getElementById("strategyTooltip");
+      if (!row || !tooltip) return;
+      tooltip.innerHTML = tooltipHtml(row);
+      tooltip.hidden = false;
+      tooltip.classList.add("is-visible");
+      if (event && typeof event.clientX === "number") {
+        positionStrategyTooltip(event);
+      } else if (event?.currentTarget) {
+        positionTooltipNearElement(event.currentTarget);
+      }
+    }
+
+    function positionStrategyTooltip(event) {
+      const tooltip = document.getElementById("strategyTooltip");
+      if (!tooltip || tooltip.hidden) return;
+      const offset = 16;
+      const rect = tooltip.getBoundingClientRect();
+      let left = event.clientX + offset;
+      let top = event.clientY + offset;
+      if (left + rect.width > window.innerWidth - 12) {
+        left = event.clientX - rect.width - offset;
+      }
+      if (top + rect.height > window.innerHeight - 12) {
+        top = event.clientY - rect.height - offset;
+      }
+      tooltip.style.left = `${Math.max(12, left)}px`;
+      tooltip.style.top = `${Math.max(12, top)}px`;
+    }
+
+    function positionTooltipNearElement(element) {
+      const tooltip = document.getElementById("strategyTooltip");
+      if (!tooltip || tooltip.hidden) return;
+      const elementRect = element.getBoundingClientRect();
+      const tooltipRect = tooltip.getBoundingClientRect();
+      let left = elementRect.left;
+      let top = elementRect.bottom + 10;
+      if (left + tooltipRect.width > window.innerWidth - 12) {
+        left = window.innerWidth - tooltipRect.width - 12;
+      }
+      if (top + tooltipRect.height > window.innerHeight - 12) {
+        top = elementRect.top - tooltipRect.height - 10;
+      }
+      tooltip.style.left = `${Math.max(12, left)}px`;
+      tooltip.style.top = `${Math.max(12, top)}px`;
+    }
+
+    function hideStrategyTooltip() {
+      const tooltip = document.getElementById("strategyTooltip");
+      if (!tooltip) return;
+      tooltip.classList.remove("is-visible");
+      tooltip.hidden = true;
+    }
+
+    function bindStrategyTooltips(table) {
+      table.querySelectorAll("[data-strategy-tooltip]").forEach(element => {
+        element.addEventListener("mouseenter", event => showStrategyTooltip(element.dataset.strategyTooltip, event));
+        element.addEventListener("mousemove", positionStrategyTooltip);
+        element.addEventListener("mouseleave", hideStrategyTooltip);
+        element.addEventListener("focus", event => showStrategyTooltip(element.dataset.strategyTooltip, event));
+        element.addEventListener("blur", hideStrategyTooltip);
+      });
+      const wrapper = table.closest(".table-wrap");
+      if (wrapper && !wrapper.dataset.tooltipBound) {
+        wrapper.addEventListener("scroll", hideStrategyTooltip);
+        wrapper.dataset.tooltipBound = "true";
+      }
+    }
+
+    function renderImages() {
+      const tabs = document.getElementById("imageTabs");
+      tabs.innerHTML = REPORT_META.chartImages.map((image, index) => (
+        `<button class="metric-chip ${state.imageIndex === index ? "active" : ""}" type="button" data-image-index="${index}">${esc(image.label)}</button>`
+      )).join("");
+      tabs.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => {
+          state.imageIndex = Number(button.dataset.imageIndex);
+          renderImages();
+        });
+      });
+      const image = REPORT_META.chartImages[state.imageIndex] || REPORT_META.chartImages[0];
+      const element = document.getElementById("chartImage");
+      element.src = image.src;
+      element.alt = image.label;
+    }
+
+    function renderCounts(rows) {
+      document.getElementById("resultCount").textContent = `${rows.length} / ${REPORT_ROWS.length}`;
+      document.getElementById("minCagrValue").textContent = fmtPct(state.minCagr);
+      document.getElementById("maxDrawdownValue").textContent = fmtPct(-state.maxDrawdown);
+    }
+
+    function sync() {
+      const rows = getFilteredRows();
+      if (state.selected && !rows.some(row => row.Strategy === state.selected)) {
+        state.selected = rows[0]?.Strategy || null;
+      }
+      renderControls();
+      renderCounts(rows);
+      renderKpis(rows);
+      renderDetail(rows);
+      renderMethodPanel();
+      renderBarChart(rows);
+      renderScatter(rows);
+      renderHeatmap(rows);
+      renderTable(rows);
+      syncChartVisibility();
+    }
+
+    function resetFilters() {
+      state.filter = "all";
+      state.search = "";
+      state.minCagr = 0;
+      state.maxDrawdown = 0.9;
+      state.beatQqq = false;
+      state.betterDd = false;
+      state.sortKey = "CAGR";
+      state.sortDir = "desc";
+      state.chartMetric = "CAGR";
+      state.chartVisibility = {
+        rank: true,
+        scatter: true,
+        heatmap: true,
+        images: true
+      };
+      document.getElementById("searchInput").value = "";
+      document.getElementById("minCagr").value = "0";
+      document.getElementById("maxDrawdown").value = "90";
+      document.getElementById("beatQqqToggle").checked = false;
+      document.getElementById("betterDdToggle").checked = false;
+      document.getElementById("sortSelect").value = "CAGR:desc";
+      sync();
+    }
+
+    function downloadCsv() {
+      const rows = getFilteredRows();
+      const header = columns.map(([, label]) => label);
+      const csvRows = [header.join(",")];
+      rows.forEach(row => {
+        csvRows.push(columns.map(([key]) => {
+          const value = row[key] ?? "";
+          const text = String(value).replaceAll('"', '""');
+          return `"${text}"`;
+        }).join(","));
+      });
+      const blob = new Blob(["\ufeff" + csvRows.join("\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "qqq_strategy_filtered_results.csv";
+      anchor.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function bindInputs() {
+      document.getElementById("searchInput").addEventListener("input", event => {
+        state.search = event.target.value;
+        sync();
+      });
+      document.getElementById("sortSelect").addEventListener("change", event => {
+        const [key, dir] = event.target.value.split(":");
+        state.sortKey = key;
+        state.sortDir = dir;
+        sync();
+      });
+      document.getElementById("minCagr").addEventListener("input", event => {
+        state.minCagr = Number(event.target.value) / 100;
+        sync();
+      });
+      document.getElementById("maxDrawdown").addEventListener("input", event => {
+        state.maxDrawdown = Number(event.target.value) / 100;
+        sync();
+      });
+      document.getElementById("beatQqqToggle").addEventListener("change", event => {
+        state.beatQqq = event.target.checked;
+        sync();
+      });
+      document.getElementById("betterDdToggle").addEventListener("change", event => {
+        state.betterDd = event.target.checked;
+        sync();
+      });
+      ["paramStart", "paramEnd", "paramInitial", "paramMonthly"].forEach(id => {
+        document.getElementById(id).addEventListener("input", renderRunCommand);
+      });
+      document.querySelectorAll(".chart-panel [data-chart-toggle]").forEach(button => {
+        button.addEventListener("click", () => {
+          toggleChart(button.dataset.chartToggle);
+        });
+      });
+      document.getElementById("resetFilters").addEventListener("click", resetFilters);
+      document.getElementById("downloadCsv").addEventListener("click", downloadCsv);
+      document.getElementById("copyCommand").addEventListener("click", copyRunCommand);
+    }
+
+    renderMeta();
+    renderRunForm();
+    bindInputs();
+    renderImages();
+    sync();
+  </script>
+</body>
+</html>
