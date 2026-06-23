@@ -3,6 +3,11 @@ qqq_buy_hold:
   weights:
     QQQ: 1.0
 
+tqqq_buy_hold:
+  type: buy_and_hold
+  weights:
+    TQQQ: 1.0
+
 qqq_80_spy_20:
   type: static_allocation
   weights:

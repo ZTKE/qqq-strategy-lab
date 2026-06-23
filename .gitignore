@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 .obsidian/
 data/raw/*.csv
+data/raw/rates/*.csv
 data/processed/*.csv
 reports/results.csv
 reports/summary.md

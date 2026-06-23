@@ -10,3 +10,44 @@ assets:
   benchmark:
     - QQQ
     - SPY
+    - TQQQ
+
+asset_history_proxies:
+  QQQ:
+    proxies:
+      - ticker: ^IXIC
+        label: Nasdaq Composite proxy before Nasdaq-100 history
+      - ticker: ^NDX
+        label: Nasdaq-100 proxy before QQQ history
+  SPY:
+    proxies:
+      - ticker: ^GSPC
+        label: S&P 500 index proxy before SPY history
+
+synthetic_leverage:
+  annual_management_fee: 0.0097
+  annual_financing_rate: 0.04
+  annual_financing_spread: 0.005
+  annual_tracking_decay: 0.002
+  trading_days: 252
+  use_dynamic_financing_rate: true
+  financing_rate_series: SOFR
+  fallback_financing_rate_series: FEDFUNDS
+  use_real_when_available: true
+  real_asset_map:
+    QQQ_2X: QLD
+    QQQ_3X: TQQQ
+    SPY_2X: SSO
+    XLK_2X: ROM
+    SMH_2X: USD
+  asset_overrides:
+    QQQ_2X:
+      annual_tracking_decay: 0.017
+    QQQ_3X:
+      annual_tracking_decay: 0.029
+    SPY_2X:
+      annual_tracking_decay: 0.0155
+    XLK_2X:
+      annual_tracking_decay: 0.0175
+    SMH_2X:
+      annual_tracking_decay: 0.0205

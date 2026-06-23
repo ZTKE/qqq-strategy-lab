@@ -19,6 +19,8 @@ def generate_report(
     start_date: pd.Timestamp,
     end_date: pd.Timestamp,
     transaction_cost: float,
+    leverage_calibration: pd.DataFrame | None = None,
+    proxy_summary: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     reports_path = Path(reports_dir)
     charts_path = reports_path / "charts"
@@ -27,6 +29,10 @@ def generate_report(
     rows, rolling_by_strategy = _build_results_rows(results)
     results_frame = pd.DataFrame(rows)
     results_frame.to_csv(reports_path / "results.csv", index=False)
+    if leverage_calibration is not None and not leverage_calibration.empty:
+        leverage_calibration.to_csv(reports_path / "leverage_calibration.csv", index=False)
+    if proxy_summary is not None and not proxy_summary.empty:
+        proxy_summary.to_csv(reports_path / "asset_proxy_summary.csv", index=False)
 
     _plot_equity_curves(results, charts_path / "equity_curves.png")
     _plot_drawdowns(results, charts_path / "drawdowns.png")
@@ -39,6 +45,8 @@ def generate_report(
         start_date=start_date,
         end_date=end_date,
         transaction_cost=transaction_cost,
+        leverage_calibration=leverage_calibration,
+        proxy_summary=proxy_summary,
     )
     (reports_path / "summary.md").write_text(summary, encoding="utf-8")
     generate_html_report(
@@ -90,6 +98,8 @@ def _build_markdown_summary(
     start_date: pd.Timestamp,
     end_date: pd.Timestamp,
     transaction_cost: float,
+    leverage_calibration: pd.DataFrame | None = None,
+    proxy_summary: pd.DataFrame | None = None,
 ) -> str:
     strategy_names = [result.strategy_name for result in results]
     benchmark = results_frame.loc[results_frame["Strategy"] == "qqq_buy_hold"]
@@ -99,6 +109,7 @@ def _build_markdown_summary(
     first_meta = results[0].metadata if results else {}
     initial_capital = float(first_meta.get("initial_capital", 20000.0))
     monthly_contribution = float(first_meta.get("monthly_contribution", 3000.0))
+    leverage_costs = first_meta.get("synthetic_leverage_costs", {})
 
     lines = [
         "# QQQ 策略实验室报告",
@@ -107,10 +118,11 @@ def _build_markdown_summary(
         "",
         "- 数据来源：yfinance 复权价格，缓存于 `data/raw`。",
         f"- 数据覆盖区间：{start_date.date()} 至 {end_date.date()}。",
-        "- 所有策略尽量从 2000 年开始；如果某个 ETF 当时还没有价格数据，对应目标仓位会暂时保留为现金，直到该 ETF 有可用价格。",
+        "- 所有策略尽量从配置起点开始；如果启用了指数代理历史，ETF 上市前会使用代理指数缩放拼接；没有代理且 ETF 尚无价格时，对应目标仓位会暂时保留为现金。",
         "- 再平衡频率：每月一次，使用当月最后一个交易日的信号。",
         f"- 资金口径：所有策略初始投入 {_fmt_money(initial_capital)}，之后每月追加 {_fmt_money(monthly_contribution)}。",
         f"- 交易成本：成交金额的 {transaction_cost:.4%}。",
+        *_synthetic_leverage_cost_lines(leverage_costs),
         "- 收益率、CAGR、回撤、波动率和夏普比率使用现金流调整后的收益曲线计算；最终净值为真实账户资产。",
         f"- 策略：{', '.join(strategy_names)}。",
         "- 重要提示：历史回测不代表未来收益。",
@@ -154,8 +166,104 @@ def _build_markdown_summary(
         "## 10. 数据充足性",
         "",
         _data_sufficiency_note(rolling_by_strategy),
+        "",
+        "## 11. 杠杆资产现实校准",
+        "",
+        _leverage_calibration_table(leverage_calibration),
+        "",
+        "## 12. 指数代理历史",
+        "",
+        _proxy_summary_table(proxy_summary),
     ]
     return "\n".join(lines) + "\n"
+
+
+def _synthetic_leverage_cost_lines(leverage_costs: dict) -> list[str]:
+    if not leverage_costs:
+        return []
+
+    management_fee = float(leverage_costs.get("annual_management_fee", 0.0))
+    financing_rate = float(leverage_costs.get("annual_financing_rate", 0.0))
+    financing_spread = float(leverage_costs.get("annual_financing_spread", 0.0))
+    tracking_decay = float(leverage_costs.get("annual_tracking_decay", 0.0))
+    trading_days = int(leverage_costs.get("trading_days", 252))
+    borrowed_cost = financing_rate + financing_spread
+    dynamic = bool(leverage_costs.get("use_dynamic_financing_rate", False))
+    preferred = leverage_costs.get("financing_rate_series", "SOFR")
+    fallback = leverage_costs.get("fallback_financing_rate_series", "FEDFUNDS")
+    real_map = leverage_costs.get("real_asset_map") or {}
+    overrides = leverage_costs.get("asset_overrides") or {}
+    real_map_text = ", ".join(f"`{synthetic}`→`{real}`" for synthetic, real in real_map.items())
+    financing_text = (
+        f"动态融资利率：优先 `{preferred}`，缺失时用 `{fallback}`，再加融资利差 {_fmt_pct(financing_spread)}"
+        if dynamic
+        else f"固定融资成本 {_fmt_pct(borrowed_cost)}"
+    )
+    return [
+        "- 合成杠杆资产成本假设："
+        f"管理费 {_fmt_pct(management_fee)}，"
+        f"{financing_text}，并乘以 (杠杆倍数 - 1)，"
+        f"额外跟踪/摩擦损耗 {_fmt_pct(tracking_decay)}，"
+        f"按每年 {trading_days} 个交易日折算为每日拖累。",
+        f"- 真实杠杆 ETF 拼接：{real_map_text if real_map_text else '未配置'}；真实 ETF 上市后优先使用真实复权价格，上市前使用动态成本合成历史。",
+        f"- 资产级校准损耗：{'已启用，用真实 ETF 上市后误差反向校准上市前合成历史。' if overrides else '未配置。'}",
+        "- 合成杠杆资产仍不是对真实杠杆 ETF 的完整复刻；真实产品还可能受到税务、申赎、跟踪误差和流动性影响。",
+    ]
+
+
+def _leverage_calibration_table(leverage_calibration: pd.DataFrame | None) -> str:
+    if leverage_calibration is None or leverage_calibration.empty:
+        return "没有可用的真实杠杆 ETF 校准数据。"
+
+    headers = ["合成资产", "真实 ETF", "区间", "合成年化", "真实年化", "年化差", "末端偏差", "最大偏差", "日收益相关", "年化跟踪误差"]
+    rows = []
+    for _, row in leverage_calibration.iterrows():
+        rows.append(
+            [
+                row["Synthetic Asset"],
+                row["Real ETF"],
+                f"{row['Start Date']} 至 {row['End Date']}",
+                _fmt_pct(row["Synthetic CAGR"]),
+                _fmt_pct(row["Real ETF CAGR"]),
+                _fmt_pct(row["CAGR Gap"]),
+                _fmt_pct(row["End Gap"]),
+                _fmt_pct(row["Max Abs Gap"]),
+                _fmt_num(row["Daily Return Corr"]),
+                _fmt_pct(row["Annualized Tracking Error"]),
+            ]
+        )
+    return "\n".join(
+        [
+            "下表用真实 ETF 上市后的区间对比“纯合成序列”和真实 ETF。偏差越大，说明该合成资产越只能当近似。",
+            "",
+            _markdown_table(headers, rows),
+        ]
+    )
+
+
+def _proxy_summary_table(proxy_summary: pd.DataFrame | None) -> str:
+    if proxy_summary is None or proxy_summary.empty:
+        return "没有启用指数代理历史。"
+
+    headers = ["资产", "代理", "代理区间", "锚定日期", "说明"]
+    rows = []
+    for _, row in proxy_summary.iterrows():
+        rows.append(
+            [
+                row["Asset"],
+                row["Proxy Ticker"],
+                f"{row['Proxy Start']} 至 {row['Proxy End']}",
+                row["Anchor Date"],
+                row.get("Proxy Label", ""),
+            ]
+        )
+    return "\n".join(
+        [
+            "ETF 上市前的历史用指数代理缩放拼接；真实 ETF 有数据后仍使用真实 ETF 价格。代理历史用于扩大压力测试样本，不等同于真实可交易产品。",
+            "",
+            _markdown_table(headers, rows),
+        ]
+    )
 
 
 def _overview_table(frame: pd.DataFrame) -> str:
@@ -181,19 +289,23 @@ def _overview_table(frame: pd.DataFrame) -> str:
 
 def _key_findings_lines(frame: pd.DataFrame) -> list[str]:
     clean = frame.copy()
+    full_start = clean["Start Date"].min()
+    full_window = clean.loc[clean["Start Date"] == full_start].copy()
+    shorter_window = clean.loc[clean["Start Date"] != full_start].copy()
+    ranking_frame = full_window if not full_window.empty else clean
     benchmark = clean.loc[clean["Strategy"] == "qqq_buy_hold"]
     benchmark_row = benchmark.iloc[0] if not benchmark.empty else clean.iloc[0]
 
-    best_final = _best_row_by(clean, "Final Equity")
-    best_cagr = _best_row_by(clean, "CAGR")
-    lowest_drawdown = _best_row_by(clean, "Max Drawdown")
-    best_calmar = _best_row_by(clean, "Calmar")
+    best_final = _best_row_by(ranking_frame, "Final Equity")
+    best_cagr = _best_row_by(ranking_frame, "CAGR")
+    lowest_drawdown = _best_row_by(ranking_frame, "Max Drawdown")
+    best_calmar = _best_row_by(ranking_frame, "Calmar")
     best_risk_adjusted = best_calmar
-    best_1y = _best_row_by(clean, "1Y CAGR")
-    best_3y = _best_row_by(clean, "3Y CAGR")
-    best_5y = _best_row_by(clean, "5Y CAGR")
-    best_10y = _best_row_by(clean, "10Y CAGR")
-    fallback_row = clean.iloc[0]
+    best_1y = _best_row_by(ranking_frame, "1Y CAGR")
+    best_3y = _best_row_by(ranking_frame, "3Y CAGR")
+    best_5y = _best_row_by(ranking_frame, "5Y CAGR")
+    best_10y = _best_row_by(ranking_frame, "10Y CAGR")
+    fallback_row = ranking_frame.iloc[0]
     best_final = best_final if best_final is not None else fallback_row
     best_cagr = best_cagr if best_cagr is not None else fallback_row
     lowest_drawdown = lowest_drawdown if lowest_drawdown is not None else fallback_row
@@ -245,7 +357,7 @@ def _key_findings_lines(frame: pd.DataFrame) -> list[str]:
 
     drawdown_buy = clean.loc[clean["Strategy"] == "drawdown_buy"]
     lines = [
-        "这部分是建议优先看的数据：终值看财富结果，CAGR 看资金效率，最大回撤看心理压力，夏普和 Calmar 看风险调整后表现。",
+        f"这部分是建议优先看的数据：主排名只比较从 {full_start} 起跑的完整区间策略；起始日期更晚的真实 ETF 基准单独提示，避免把不同样本期混成一个结论。",
         "",
         _markdown_table(["你关心的问题", "当前答案", "关键数据", "怎么看"], rows),
         "",
@@ -261,6 +373,13 @@ def _key_findings_lines(frame: pd.DataFrame) -> list[str]:
             f"- `drawdown_buy` 当前结果不理想：年化 {_fmt_pct(row['CAGR'])}，最大回撤 {_fmt_pct(row['Max Drawdown'])}，"
             f"没有比 QQQ 买入持有提供更好的风险收益交换。"
         )
+    if not shorter_window.empty:
+        best_short = _best_row_by(shorter_window, "CAGR")
+        if best_short is not None:
+            lines.append(
+                f"- 起始日期更晚的真实 ETF 基准里，`{best_short['Strategy']}` 从 {best_short['Start Date']} 开始，"
+                f"年化 {_fmt_pct(best_short['CAGR'])}，最大回撤 {_fmt_pct(best_short['Max Drawdown'])}；这不与 2000 起跑策略直接同窗排名。"
+            )
 
     return lines
 

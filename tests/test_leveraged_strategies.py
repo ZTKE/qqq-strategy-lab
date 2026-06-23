@@ -2,7 +2,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.main import add_synthetic_leverage_assets
+from src.main import (
+    add_synthetic_leverage_assets,
+    apply_asset_history_proxies,
+    stitch_real_leverage_series,
+    synthetic_leverage_daily_cost_series,
+)
 from src.strategies import build_strategy
 
 
@@ -190,3 +195,87 @@ def test_synthetic_leverage_assets_use_daily_compounding():
     assert output.loc[dates[1], "QQQ_2X"] == pytest.approx(120.0)
     assert output.loc[dates[2], "QQQ_2X"] == pytest.approx(96.0)
     assert output.loc[dates[1], "QQQ_3X"] == pytest.approx(130.0)
+
+
+def test_synthetic_leverage_assets_apply_management_and_financing_drag():
+    dates = pd.bdate_range("2024-01-02", periods=3)
+    prices = pd.DataFrame({"QQQ": [100.0, 110.0, 99.0]}, index=dates)
+    leverage_costs = {
+        "annual_management_fee": 0.252,
+        "annual_financing_rate": 0.252,
+        "annual_financing_spread": 0.0,
+        "annual_tracking_decay": 0.0,
+        "trading_days": 252,
+    }
+
+    output = add_synthetic_leverage_assets(prices, ["QQQ_2X", "QQQ_3X"], leverage_costs=leverage_costs)
+
+    assert output.loc[dates[0], "QQQ_2X"] == pytest.approx(100.0)
+    assert output.loc[dates[1], "QQQ_2X"] == pytest.approx(119.8)
+    assert output.loc[dates[2], "QQQ_2X"] == pytest.approx(95.6004)
+    assert output.loc[dates[1], "QQQ_3X"] == pytest.approx(129.7)
+
+
+def test_synthetic_leverage_assets_apply_dynamic_financing_rates():
+    dates = pd.bdate_range("2024-01-02", periods=2)
+    financing_rates = pd.Series([0.01, 0.05], index=dates)
+    leverage_costs = {
+        "annual_management_fee": 0.0,
+        "annual_financing_rate": 0.0,
+        "annual_financing_spread": 0.0,
+        "annual_tracking_decay": 0.0,
+        "trading_days": 100,
+    }
+
+    daily_cost = synthetic_leverage_daily_cost_series(
+        dates,
+        "QQQ_3X",
+        3,
+        leverage_costs=leverage_costs,
+        financing_rates=financing_rates,
+    )
+
+    assert daily_cost.iloc[0] == pytest.approx(0.0002)
+    assert daily_cost.iloc[1] == pytest.approx(0.001)
+
+
+def test_stitch_real_leverage_series_preserves_continuity_at_first_real_date():
+    dates = pd.bdate_range("2024-01-02", periods=4)
+    synthetic = pd.Series([100.0, 120.0, 140.0, 160.0], index=dates, name="QQQ_3X")
+    real = pd.Series([10.0, 11.0], index=dates[2:])
+
+    stitched = stitch_real_leverage_series(synthetic, real)
+
+    assert stitched.loc[dates[1]] == pytest.approx(120.0)
+    assert stitched.loc[dates[2]] == pytest.approx(140.0)
+    assert stitched.loc[dates[3]] == pytest.approx(154.0)
+
+
+def test_apply_asset_history_proxies_builds_chained_prehistory():
+    dates = pd.bdate_range("2024-01-02", periods=6)
+    prices = pd.DataFrame(
+        {
+            "QQQ": [np.nan, np.nan, np.nan, np.nan, 100.0, 110.0],
+            "^NDX": [np.nan, np.nan, 40.0, 50.0, 100.0, 110.0],
+            "^IXIC": [10.0, 20.0, 16.0, 20.0, 40.0, 44.0],
+        },
+        index=dates,
+    )
+    proxy_config = {
+        "QQQ": {
+            "proxies": [
+                {"ticker": "^IXIC", "label": "oldest"},
+                {"ticker": "^NDX", "label": "newer"},
+            ]
+        }
+    }
+
+    output, summary = apply_asset_history_proxies(prices, proxy_config)
+
+    assert output.loc[dates[0], "QQQ"] == pytest.approx(25.0)
+    assert output.loc[dates[1], "QQQ"] == pytest.approx(50.0)
+    assert output.loc[dates[2], "QQQ"] == pytest.approx(40.0)
+    assert output.loc[dates[3], "QQQ"] == pytest.approx(50.0)
+    assert output.loc[dates[4], "QQQ"] == pytest.approx(100.0)
+    assert output.loc[dates[5], "QQQ"] == pytest.approx(110.0)
+    assert set(summary["Proxy Ticker"]) == {"^NDX", "^IXIC"}

@@ -1,0 +1,4 @@
+Asset,Proxy Ticker,Proxy Label,Proxy Start,Proxy End,Anchor Date,Scale,Original Asset Start
+QQQ,^NDX,Nasdaq-100 proxy before QQQ history,1985-10-01,1999-12-31,2000-01-03,0.02108597120988519,2000-01-03
+QQQ,^IXIC,Nasdaq Composite proxy before Nasdaq-100 history,1971-02-05,1985-09-30,1985-10-01,0.00839098971268894,2000-01-03
+SPY,^GSPC,S&P 500 index proxy before SPY history,1971-01-04,1999-12-31,2000-01-03,0.06278608788304361,2000-01-03
