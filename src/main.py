@@ -47,6 +47,7 @@ def main() -> None:
     print(f"Project: {PROJECT_ROOT}")
     print(f"Report: {PROJECT_ROOT / 'reports' / 'summary.md'}")
     print(f"Dashboard: {PROJECT_ROOT / 'reports' / 'dashboard.html'}")
+    print(f"Charts: {PROJECT_ROOT / 'reports' / 'charts.html'}")
     print(f"Results: {PROJECT_ROOT / 'reports' / 'results.csv'}")
 
 

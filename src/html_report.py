@@ -68,14 +68,20 @@ def generate_html_report(
         "strategyCount": int(len(results_frame)),
         "totalInvested": _clean_value(results_frame["Total Invested"].max()) if "Total Invested" in results_frame else None,
         "chartImages": CHART_IMAGES,
+        "chartPage": "charts.html",
     }
 
     html = HTML_TEMPLATE.replace("__REPORT_META__", json.dumps(meta, ensure_ascii=False, allow_nan=False))
     html = html.replace("__REPORT_ROWS__", json.dumps(rows, ensure_ascii=False, allow_nan=False))
     html = html.replace("__REPORT_SERIES__", json.dumps(series, ensure_ascii=False, allow_nan=False))
 
+    charts_html = CHART_PAGE_TEMPLATE.replace("__REPORT_META__", json.dumps(meta, ensure_ascii=False, allow_nan=False))
+    charts_html = charts_html.replace("__REPORT_ROWS__", json.dumps(rows, ensure_ascii=False, allow_nan=False))
+    charts_html = charts_html.replace("__REPORT_SERIES__", json.dumps(series, ensure_ascii=False, allow_nan=False))
+
     output_path = reports_path / "dashboard.html"
     output_path.write_text(html, encoding="utf-8")
+    (reports_path / "charts.html").write_text(charts_html, encoding="utf-8")
     return output_path
 
 
@@ -835,6 +841,45 @@ HTML_TEMPLATE = r"""<!doctype html>
       gap: 16px;
     }
 
+    .chart-toggle-field,
+    .dashboard-inline-chart {
+      display: none;
+    }
+
+    .chart-link-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    .chart-link-card {
+      min-height: 98px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+      color: var(--ink);
+      text-decoration: none;
+      padding: 12px;
+      display: grid;
+      align-content: start;
+      gap: 7px;
+    }
+
+    .chart-link-card:hover {
+      border-color: rgba(15, 118, 110, 0.46);
+      background: #f1faf7;
+    }
+
+    .chart-link-card strong {
+      font-size: 14px;
+    }
+
+    .chart-link-card span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
     .chart-stage {
       min-height: 300px;
       overflow: hidden;
@@ -1359,6 +1404,10 @@ HTML_TEMPLATE = r"""<!doctype html>
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
+      .chart-link-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
       .dashboard-grid,
       .chart-grid,
       .line-chart-layout,
@@ -1403,6 +1452,7 @@ HTML_TEMPLATE = r"""<!doctype html>
       }
 
       .param-grid,
+      .chart-link-grid,
       .method-item {
         grid-template-columns: 1fr;
       }
@@ -1496,7 +1546,7 @@ HTML_TEMPLATE = r"""<!doctype html>
           <div class="chip-grid" id="filterChips"></div>
         </div>
 
-        <div class="field">
+        <div class="field chart-toggle-field">
           <label>图表显示</label>
           <div class="chart-toggle-grid" id="chartToggles"></div>
         </div>
@@ -1561,7 +1611,36 @@ HTML_TEMPLATE = r"""<!doctype html>
           <div id="methodPanel" class="method-list"></div>
         </section>
 
-        <section class="panel chart-panel" data-chart-panel="curves" aria-label="策略曲线图">
+        <section class="panel" aria-label="独立图表页面">
+          <div class="section-title">
+            <h2>独立图表页面</h2>
+            <small>每张图占完整页面宽度</small>
+          </div>
+          <div class="chart-link-grid">
+            <a class="chart-link-card" href="charts.html#curves">
+              <strong>策略曲线图</strong>
+              <span>净值、回撤、滚动 1 年，图例逐条隐藏。</span>
+            </a>
+            <a class="chart-link-card" href="charts.html#rank">
+              <strong>收益 / 回撤排行</strong>
+              <span>按指标切换，完整横向空间看排名。</span>
+            </a>
+            <a class="chart-link-card" href="charts.html#scatter">
+              <strong>风险收益散点</strong>
+              <span>波动率、年化收益和回撤一起看。</span>
+            </a>
+            <a class="chart-link-card" href="charts.html#heatmap">
+              <strong>滚动周期热力图</strong>
+              <span>1 / 3 / 5 / 7 / 10 年周期对比。</span>
+            </a>
+            <a class="chart-link-card" href="charts.html#images">
+              <strong>原始回测图</strong>
+              <span>保留 PNG 原图，可横向滚动查看。</span>
+            </a>
+          </div>
+        </section>
+
+        <section class="panel chart-panel dashboard-inline-chart" data-chart-panel="curves" aria-label="策略曲线图">
           <div class="section-title">
             <h2>策略曲线图</h2>
             <div class="title-actions">
@@ -1580,7 +1659,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         </section>
 
         <section class="chart-grid" aria-label="交互图表">
-          <div class="panel chart-panel" data-chart-panel="rank">
+          <div class="panel chart-panel dashboard-inline-chart" data-chart-panel="rank">
             <div class="section-title">
               <h2>收益 / 回撤排行</h2>
               <div class="title-actions">
@@ -1595,7 +1674,7 @@ HTML_TEMPLATE = r"""<!doctype html>
             </div>
           </div>
 
-          <div class="panel chart-panel" data-chart-panel="scatter">
+          <div class="panel chart-panel dashboard-inline-chart" data-chart-panel="scatter">
             <div class="section-title">
               <h2>风险收益散点</h2>
               <div class="title-actions">
@@ -1610,7 +1689,7 @@ HTML_TEMPLATE = r"""<!doctype html>
           </div>
         </section>
 
-        <section class="panel chart-panel" data-chart-panel="heatmap" aria-label="滚动周期热力图">
+        <section class="panel chart-panel dashboard-inline-chart" data-chart-panel="heatmap" aria-label="滚动周期热力图">
           <div class="section-title">
             <h2>近 1 / 3 / 5 / 7 / 10 年年化热力图</h2>
             <div class="title-actions">
@@ -1634,7 +1713,7 @@ HTML_TEMPLATE = r"""<!doctype html>
           </div>
         </section>
 
-        <section class="panel chart-panel" data-chart-panel="images" aria-label="原始图表">
+        <section class="panel chart-panel dashboard-inline-chart" data-chart-panel="images" aria-label="原始图表">
           <div class="section-title">
             <h2>原始回测图</h2>
             <div class="title-actions">
@@ -2586,6 +2665,1147 @@ HTML_TEMPLATE = r"""<!doctype html>
     renderRunForm();
     bindInputs();
     renderImages();
+    sync();
+  </script>
+</body>
+</html>
+"""
+
+
+CHART_PAGE_TEMPLATE = r"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QQQ 策略实验室 - 独立图表页面</title>
+  <style>
+    :root {
+      --bg: #f6f8f7;
+      --surface: #ffffff;
+      --surface-soft: #eef3f1;
+      --ink: #18211f;
+      --muted: #66736f;
+      --line: #d8e0dd;
+      --accent: #0f766e;
+      --accent-strong: #0b5f59;
+      --blue: #2563eb;
+      --orange: #c05621;
+      --red: #b42318;
+      --green: #0b7a53;
+      --shadow: 0 12px 34px rgba(24, 33, 31, 0.10);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: light;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Inter", "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .chart-shell {
+      width: min(100%, 1760px);
+      margin: 0 auto;
+      padding: 22px 28px 30px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) auto;
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      line-height: 1.12;
+      font-weight: 760;
+      overflow-wrap: anywhere;
+    }
+
+    .meta-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .meta-pill {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.72);
+      border-radius: 999px;
+      padding: 5px 9px;
+      white-space: nowrap;
+    }
+
+    .button {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--ink);
+      min-height: 36px;
+      padding: 7px 12px;
+      border-radius: var(--radius);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      text-decoration: none;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.8);
+    }
+
+    .button.primary,
+    .tab.active,
+    .filter-chip.active,
+    .metric-chip.active {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+    }
+
+    .control-panel,
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: var(--shadow);
+    }
+
+    .control-panel {
+      display: grid;
+      grid-template-columns: minmax(220px, 0.8fr) minmax(280px, 1.4fr) minmax(240px, 0.8fr) minmax(250px, 0.8fr);
+      gap: 12px;
+      padding: 14px;
+      margin-bottom: 14px;
+      align-items: end;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    label,
+    .field-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .searchbox,
+    .selectbox {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+      color: var(--ink);
+      padding: 8px 10px;
+      outline: none;
+    }
+
+    .chip-grid,
+    .tab-row,
+    .toggle-row,
+    .image-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .tab-row {
+      margin-bottom: 14px;
+    }
+
+    .tab,
+    .filter-chip,
+    .metric-chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fbfcfc;
+      color: var(--ink);
+      min-height: 36px;
+      padding: 7px 13px;
+      text-decoration: none;
+    }
+
+    .tab {
+      border-radius: var(--radius);
+      font-weight: 720;
+    }
+
+    .toggle {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+      padding: 7px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: #31413d;
+      font-size: 13px;
+    }
+
+    .range-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .panel {
+      padding: 16px;
+      min-width: 0;
+    }
+
+    .chart-view[hidden] {
+      display: none;
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+      margin-bottom: 12px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: 21px;
+      line-height: 1.25;
+    }
+
+    .section-title small {
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .chart-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .line-chart-layout {
+      display: grid;
+      gap: 12px;
+    }
+
+    .line-chart-stage,
+    .chart-stage {
+      width: 100%;
+      min-height: 620px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+    }
+
+    .line-chart-stage svg,
+    .chart-stage svg {
+      width: 100%;
+      min-width: 1120px;
+      height: auto;
+      display: block;
+    }
+
+    .legend-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 7px;
+      max-height: 230px;
+      overflow: auto;
+      padding: 2px 4px 2px 0;
+    }
+
+    .legend-count {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      padding: 8px 2px 0;
+    }
+
+    .legend-item {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fbfcfc;
+      color: var(--ink);
+      min-height: 34px;
+      padding: 6px 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-align: left;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .legend-item:hover {
+      border-color: rgba(15, 118, 110, 0.42);
+      background: #f1faf7;
+    }
+
+    .legend-item.off {
+      color: var(--muted);
+      background: #f1f4f3;
+      text-decoration: line-through;
+    }
+
+    .legend-swatch {
+      width: 18px;
+      height: 3px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+
+    .legend-item.off .legend-swatch {
+      opacity: 0.35;
+    }
+
+    .line-path {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .line-grid {
+      stroke: #e5ece9;
+      stroke-width: 1;
+    }
+
+    .line-axis {
+      stroke: #bfcbc7;
+      stroke-width: 1;
+    }
+
+    .axis-label {
+      fill: var(--muted);
+      font-size: 12px;
+    }
+
+    .bar-label,
+    .point-label {
+      fill: var(--ink);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .bar-value {
+      fill: var(--muted);
+      font-size: 12px;
+    }
+
+    .heatmap {
+      display: grid;
+      gap: 7px;
+      overflow: auto;
+      padding-bottom: 3px;
+    }
+
+    .heat-row {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) repeat(5, minmax(108px, 0.34fr));
+      gap: 7px;
+      align-items: stretch;
+      min-width: 860px;
+    }
+
+    .heat-cell {
+      border: 0;
+      border-radius: 7px;
+      padding: 9px 10px;
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      font-size: 13px;
+      font-weight: 680;
+      color: #17332a;
+    }
+
+    button.heat-cell {
+      cursor: pointer;
+      font: inherit;
+    }
+
+    button.heat-cell:hover {
+      outline: 2px solid rgba(15, 118, 110, 0.28);
+      outline-offset: 0;
+    }
+
+    .heat-name {
+      justify-content: flex-start;
+      background: #f1f5f4;
+      color: var(--ink);
+      overflow-wrap: anywhere;
+    }
+
+    .heat-head {
+      background: transparent;
+      color: var(--muted);
+      font-weight: 700;
+      min-height: 22px;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+
+    .image-frame {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+      overflow: auto;
+      min-height: 620px;
+    }
+
+    .image-frame img {
+      display: block;
+      width: 100%;
+      min-width: 1120px;
+      height: auto;
+    }
+
+    .empty-state {
+      min-height: 280px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfc;
+      text-align: center;
+      padding: 18px;
+    }
+
+    .footnote {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      margin: 10px 0 0;
+    }
+
+    @media (max-width: 1180px) {
+      .control-panel {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 760px) {
+      .chart-shell {
+        padding: 14px;
+      }
+
+      .topbar,
+      .control-panel {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="chart-shell">
+    <header class="topbar">
+      <div>
+        <h1 id="reportTitle">QQQ 策略实验室 · 独立图表页面</h1>
+        <div class="meta-line" id="metaLine"></div>
+      </div>
+      <a class="button" href="dashboard.html">返回总览</a>
+    </header>
+
+    <section class="control-panel" aria-label="图表筛选">
+      <div class="field">
+        <label for="searchInput">搜索策略 / 资产 / 标签</label>
+        <input class="searchbox" id="searchInput" type="search" placeholder="例如 trend、2x、SHY" />
+      </div>
+      <div class="field">
+        <span class="field-label">策略标签</span>
+        <div class="chip-grid" id="filterChips"></div>
+      </div>
+      <div class="field">
+        <div class="range-row">
+          <label for="minCagr">最低年化收益</label>
+          <strong id="minCagrValue"></strong>
+        </div>
+        <input id="minCagr" type="range" min="0" max="30" step="1" value="0" />
+      </div>
+      <div class="field">
+        <div class="range-row">
+          <label for="maxDrawdown">最大可承受回撤</label>
+          <strong id="maxDrawdownValue"></strong>
+        </div>
+        <input id="maxDrawdown" type="range" min="30" max="90" step="1" value="90" />
+      </div>
+      <div class="field">
+        <span class="field-label">快速条件</span>
+        <div class="toggle-row">
+          <label class="toggle">
+            <input id="beatQqqToggle" type="checkbox" />
+            年化收益高于 QQQ
+          </label>
+          <label class="toggle">
+            <input id="betterDdToggle" type="checkbox" />
+            最大回撤优于 QQQ
+          </label>
+          <button class="button" id="resetFilters" type="button">重置</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">当前结果</span>
+        <div class="meta-line" id="chartSummary"></div>
+      </div>
+    </section>
+
+    <nav class="tab-row" id="chartTabs" aria-label="图表导航"></nav>
+
+    <section class="panel chart-view" data-view="curves">
+      <div class="section-title">
+        <h2>策略曲线图</h2>
+        <small>图例在下方，点击策略名隐藏或恢复对应曲线。</small>
+      </div>
+      <div class="chart-toolbar">
+        <div class="chip-grid" id="curveModeChips"></div>
+      </div>
+      <div class="line-chart-layout">
+        <div class="line-chart-stage" id="interactiveLineChart"></div>
+        <div>
+          <div class="legend-count" id="lineLegendCount"></div>
+          <div class="legend-panel" id="lineLegend"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel chart-view" data-view="rank" hidden>
+      <div class="section-title">
+        <h2>收益 / 回撤排行</h2>
+        <small>当前筛选后的策略会重新排序。</small>
+      </div>
+      <div class="chart-toolbar">
+        <div class="chip-grid" id="metricChips"></div>
+      </div>
+      <div class="chart-stage" id="barChart"></div>
+    </section>
+
+    <section class="panel chart-view" data-view="scatter" hidden>
+      <div class="section-title">
+        <h2>风险收益散点</h2>
+        <small>横轴是波动率，纵轴是年化收益，点大小参考最终净值。</small>
+      </div>
+      <div class="chart-stage" id="scatterChart"></div>
+    </section>
+
+    <section class="panel chart-view" data-view="heatmap" hidden>
+      <div class="section-title">
+        <h2>滚动周期热力图</h2>
+        <small>绿色越深表示对应周期年化收益越高。</small>
+      </div>
+      <div id="heatmap" class="heatmap"></div>
+    </section>
+
+    <section class="panel chart-view" data-view="images" hidden>
+      <div class="section-title">
+        <h2>原始回测图</h2>
+        <small>来自 reports/charts 的 PNG 原图。</small>
+      </div>
+      <div class="image-tabs" id="imageTabs"></div>
+      <div class="image-frame">
+        <img id="chartImage" alt="回测图表" />
+      </div>
+      <p class="footnote">历史回测不构成投资建议。</p>
+    </section>
+  </main>
+
+  <script>
+    const REPORT_META = __REPORT_META__;
+    const REPORT_ROWS = __REPORT_ROWS__;
+    const REPORT_SERIES = __REPORT_SERIES__;
+
+    const viewOptions = [
+      ["curves", "策略曲线图"],
+      ["rank", "收益排行"],
+      ["scatter", "风险散点"],
+      ["heatmap", "周期热力图"],
+      ["images", "原始图"]
+    ];
+
+    const filterOptions = [
+      ["all", "全部"],
+      ["基准", "基准"],
+      ["无杠杆", "无杠杆"],
+      ["杠杆", "杠杆"],
+      ["趋势", "趋势"],
+      ["动量", "动量"],
+      ["定投", "定投"],
+      ["防守", "防守"],
+      ["回撤", "回撤"]
+    ];
+
+    const metricOptions = [
+      ["CAGR", "年化"],
+      ["Final Equity", "终值"],
+      ["Max Drawdown", "回撤"],
+      ["Sharpe", "夏普"],
+      ["Calmar", "Calmar"],
+      ["10Y CAGR", "10 年"]
+    ];
+
+    const curveModeOptions = [
+      ["equity", "净值"],
+      ["drawdown", "回撤"],
+      ["rolling", "滚动 1 年"]
+    ];
+
+    const lineColors = [
+      "#0f766e", "#2563eb", "#c05621", "#7c3aed", "#dc2626", "#0891b2",
+      "#16a34a", "#9333ea", "#ea580c", "#64748b", "#be123c", "#0d9488",
+      "#4f46e5", "#ca8a04", "#15803d", "#b45309", "#0369a1", "#a21caf"
+    ];
+
+    const state = {
+      view: "curves",
+      filter: "all",
+      search: "",
+      minCagr: 0,
+      maxDrawdown: 0.9,
+      beatQqq: false,
+      betterDd: false,
+      chartMetric: "CAGR",
+      curveMode: "equity",
+      imageIndex: 0,
+      selected: null,
+      hiddenSeries: {}
+    };
+
+    const benchmark = REPORT_ROWS.find(row => row.Strategy === "qqq_buy_hold") || REPORT_ROWS[0];
+
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[char]));
+    }
+
+    function fmtPct(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
+      return `${(Number(value) * 100).toFixed(2)}%`;
+    }
+
+    function fmtMoney(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
+      return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value));
+    }
+
+    function fmtCompactMoney(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        notation: "compact",
+        maximumFractionDigits: 1
+      }).format(Number(value));
+    }
+
+    function fmtNum(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
+      return Number(value).toFixed(2);
+    }
+
+    function fmtMetric(value, type) {
+      if (type === "money") return fmtMoney(value);
+      if (type === "pct") return fmtPct(value);
+      if (type === "num") return fmtNum(value);
+      return value ?? "N/A";
+    }
+
+    function fmtCurveValue(value) {
+      return state.curveMode === "equity" ? fmtCompactMoney(value) : fmtPct(value);
+    }
+
+    function fmtDate(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "";
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    }
+
+    function metricFormatFor(key) {
+      if (key.includes("Return") || key.includes("CAGR") || key.includes("Drawdown") || key.includes("MaxDD") || key === "Volatility") return "pct";
+      if (key.includes("Equity") || key.includes("Invested")) return "money";
+      return "num";
+    }
+
+    function colorForStrategy(strategyName) {
+      const seriesIndex = (REPORT_SERIES.strategies || []).indexOf(strategyName);
+      const rowIndex = REPORT_ROWS.findIndex(row => row.Strategy === strategyName);
+      const index = seriesIndex >= 0 ? seriesIndex : Math.max(0, rowIndex);
+      return lineColors[index % lineColors.length];
+    }
+
+    function parsedSeries(strategyName, seriesByStrategy) {
+      return (seriesByStrategy[strategyName] || [])
+        .map(point => ({ t: Date.parse(point.d), v: Number(point.v), d: point.d }))
+        .filter(point => Number.isFinite(point.t) && Number.isFinite(point.v))
+        .sort((a, b) => a.t - b.t);
+    }
+
+    function getViewFromHash() {
+      const view = location.hash.replace("#", "");
+      return viewOptions.some(([value]) => value === view) ? view : "curves";
+    }
+
+    function getFilteredRows() {
+      const query = state.search.trim().toLowerCase();
+      return REPORT_ROWS.filter(row => {
+        const tags = row.Tags || [];
+        const text = `${row.Strategy} ${row["Required Assets"]} ${tags.join(" ")}`.toLowerCase();
+        if (state.filter !== "all" && !tags.includes(state.filter)) return false;
+        if (query && !text.includes(query)) return false;
+        if ((row.CAGR ?? -Infinity) < state.minCagr) return false;
+        if (Math.abs(row["Max Drawdown"] ?? 0) > state.maxDrawdown) return false;
+        if (state.beatQqq && benchmark && row.CAGR <= benchmark.CAGR) return false;
+        if (state.betterDd && benchmark && row["Max Drawdown"] <= benchmark["Max Drawdown"]) return false;
+        return true;
+      });
+    }
+
+    function renderMeta() {
+      document.getElementById("reportTitle").textContent = `${REPORT_META.title} · 独立图表页面`;
+      document.getElementById("metaLine").innerHTML = [
+        `区间 ${REPORT_META.startDate} 至 ${REPORT_META.endDate}`,
+        `${REPORT_META.strategyCount} 个策略`,
+        `初始资金 ${fmtMoney(REPORT_META.initialCapital)}`,
+        `每月追加 ${fmtMoney(REPORT_META.monthlyContribution)}`,
+        `生成 ${REPORT_META.generatedAt}`
+      ].map(item => `<span class="meta-pill">${esc(item)}</span>`).join("");
+    }
+
+    function renderTabs() {
+      const host = document.getElementById("chartTabs");
+      host.innerHTML = viewOptions.map(([value, label]) => (
+        `<a class="tab ${state.view === value ? "active" : ""}" href="#${esc(value)}">${esc(label)}</a>`
+      )).join("");
+    }
+
+    function renderControls(rows) {
+      document.getElementById("minCagrValue").textContent = fmtPct(state.minCagr);
+      document.getElementById("maxDrawdownValue").textContent = fmtPct(-state.maxDrawdown);
+      document.getElementById("chartSummary").innerHTML = [
+        `${rows.length} / ${REPORT_ROWS.length} 个策略`,
+        `当前图：${viewOptions.find(([value]) => value === state.view)?.[1] || ""}`
+      ].map(item => `<span class="meta-pill">${esc(item)}</span>`).join("");
+
+      const filterHost = document.getElementById("filterChips");
+      filterHost.innerHTML = filterOptions.map(([value, label]) => (
+        `<button class="filter-chip ${state.filter === value ? "active" : ""}" type="button" data-filter="${esc(value)}">${esc(label)}</button>`
+      )).join("");
+      filterHost.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => {
+          state.filter = button.dataset.filter;
+          sync();
+        });
+      });
+
+      const curveModeHost = document.getElementById("curveModeChips");
+      curveModeHost.innerHTML = curveModeOptions.map(([value, label]) => (
+        `<button class="metric-chip ${state.curveMode === value ? "active" : ""}" type="button" data-curve-mode="${esc(value)}">${esc(label)}</button>`
+      )).join("");
+      curveModeHost.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => {
+          state.curveMode = button.dataset.curveMode;
+          sync();
+        });
+      });
+
+      const metricHost = document.getElementById("metricChips");
+      metricHost.innerHTML = metricOptions.map(([value, label]) => (
+        `<button class="metric-chip ${state.chartMetric === value ? "active" : ""}" type="button" data-metric="${esc(value)}">${esc(label)}</button>`
+      )).join("");
+      metricHost.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => {
+          state.chartMetric = button.dataset.metric;
+          sync();
+        });
+      });
+    }
+
+    function syncView() {
+      document.querySelectorAll("[data-view]").forEach(section => {
+        section.hidden = section.dataset.view !== state.view;
+      });
+      renderTabs();
+    }
+
+    function renderInteractiveLineChart(rows) {
+      const chartHost = document.getElementById("interactiveLineChart");
+      const legendHost = document.getElementById("lineLegend");
+      const legendCount = document.getElementById("lineLegendCount");
+      const seriesByStrategy = REPORT_SERIES[state.curveMode] || {};
+      const strategies = rows
+        .map(row => row.Strategy)
+        .filter(strategy => (seriesByStrategy[strategy] || []).length);
+
+      const visibleCount = strategies.filter(strategy => !state.hiddenSeries[strategy]).length;
+      legendCount.textContent = strategies.length ? `${visibleCount} / ${strategies.length} 条曲线显示` : "当前筛选没有可绘制曲线";
+      legendHost.innerHTML = strategies.map(strategy => {
+        const hidden = Boolean(state.hiddenSeries[strategy]);
+        return `<button class="legend-item ${hidden ? "off" : ""}" type="button" aria-pressed="${hidden ? "false" : "true"}" data-line-strategy="${esc(strategy)}">
+          <span class="legend-swatch" style="background:${colorForStrategy(strategy)}"></span>
+          <span>${esc(strategy)}</span>
+        </button>`;
+      }).join("");
+
+      legendHost.querySelectorAll("[data-line-strategy]").forEach(button => {
+        button.addEventListener("click", () => {
+          const strategy = button.dataset.lineStrategy;
+          state.hiddenSeries[strategy] = !state.hiddenSeries[strategy];
+          renderInteractiveLineChart(getFilteredRows());
+        });
+      });
+
+      if (!strategies.length) {
+        chartHost.innerHTML = `<div class="empty-state">没有曲线可画。</div>`;
+        return;
+      }
+
+      const seriesMap = new Map(strategies.map(strategy => [strategy, parsedSeries(strategy, seriesByStrategy)]));
+      const visibleStrategies = strategies.filter(strategy => !state.hiddenSeries[strategy] && (seriesMap.get(strategy) || []).length);
+      if (!visibleStrategies.length) {
+        chartHost.innerHTML = `<div class="empty-state">全部曲线已隐藏。</div>`;
+        return;
+      }
+
+      const allPoints = visibleStrategies.flatMap(strategy => seriesMap.get(strategy));
+      const xValues = allPoints.map(point => point.t);
+      const yValues = allPoints.map(point => point.v);
+      let minX = Math.min(...xValues);
+      let maxX = Math.max(...xValues);
+      let minY = Math.min(...yValues);
+      let maxY = Math.max(...yValues);
+
+      if (minX === maxX) {
+        minX -= 86400000;
+        maxX += 86400000;
+      }
+      if (state.curveMode === "equity") {
+        minY = Math.max(0, minY * 0.96);
+        maxY = maxY * 1.04;
+      } else if (state.curveMode === "drawdown") {
+        minY = Math.min(minY * 1.08, minY - 0.01);
+        maxY = 0;
+      } else {
+        const yPad = Math.max(0.02, (maxY - minY) * 0.08);
+        minY -= yPad;
+        maxY += yPad;
+      }
+      if (minY === maxY) {
+        minY -= 0.01;
+        maxY += 0.01;
+      }
+
+      const width = 1380;
+      const height = 640;
+      const pad = { left: 90, right: 34, top: 34, bottom: 56 };
+      const innerW = width - pad.left - pad.right;
+      const innerH = height - pad.top - pad.bottom;
+      const xScale = value => pad.left + (value - minX) / (maxX - minX) * innerW;
+      const yScale = value => height - pad.bottom - (value - minY) / (maxY - minY) * innerH;
+      const yTicks = Array.from({ length: 6 }, (_, index) => minY + (maxY - minY) * index / 5);
+      const xTicks = Array.from({ length: 6 }, (_, index) => minX + (maxX - minX) * index / 5);
+      const modeLabel = curveModeOptions.find(([value]) => value === state.curveMode)?.[1] || "曲线";
+
+      const yGrid = yTicks.map(value => {
+        const y = yScale(value);
+        return `<g>
+          <line class="line-grid" x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" />
+          <text class="axis-label" x="${pad.left - 12}" y="${y + 4}" text-anchor="end">${esc(fmtCurveValue(value))}</text>
+        </g>`;
+      }).join("");
+      const xGrid = xTicks.map(value => {
+        const x = xScale(value);
+        return `<g>
+          <line class="line-grid" x1="${x}" y1="${pad.top}" x2="${x}" y2="${height - pad.bottom}" />
+          <text class="axis-label" x="${x}" y="${height - 20}" text-anchor="middle">${esc(fmtDate(value))}</text>
+        </g>`;
+      }).join("");
+
+      const paths = visibleStrategies.map(strategy => {
+        const points = seriesMap.get(strategy);
+        const d = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xScale(point.t).toFixed(2)} ${yScale(point.v).toFixed(2)}`).join(" ");
+        const last = points[points.length - 1];
+        const color = colorForStrategy(strategy);
+        return `<g data-line-strategy="${esc(strategy)}">
+          <path class="line-path" d="${d}" stroke="${color}" stroke-width="${strategy === state.selected ? 3.2 : 2.2}" opacity="${strategy === state.selected ? 0.98 : 0.82}">
+            <title>${esc(strategy)} · ${esc(modeLabel)} · ${esc(fmtCurveValue(last.v))}</title>
+          </path>
+          <circle cx="${xScale(last.t)}" cy="${yScale(last.v)}" r="${strategy === state.selected ? 4.4 : 3.2}" fill="${color}" stroke="white" stroke-width="1.5">
+            <title>${esc(strategy)} · ${esc(fmtCurveValue(last.v))}</title>
+          </circle>
+        </g>`;
+      }).join("");
+
+      chartHost.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="策略${esc(modeLabel)}曲线">
+        ${yGrid}
+        ${xGrid}
+        <line class="line-axis" x1="${pad.left}" y1="${height - pad.bottom}" x2="${width - pad.right}" y2="${height - pad.bottom}" />
+        <line class="line-axis" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${height - pad.bottom}" />
+        <text class="axis-label" x="${pad.left}" y="20">${esc(modeLabel)}</text>
+        ${paths}
+      </svg>`;
+
+      chartHost.querySelectorAll("[data-line-strategy]").forEach(group => {
+        group.addEventListener("click", () => {
+          state.selected = group.dataset.lineStrategy;
+          sync();
+        });
+      });
+    }
+
+    function renderBarChart(rows) {
+      const host = document.getElementById("barChart");
+      if (!rows.length) {
+        host.innerHTML = `<div class="empty-state">没有数据可画。</div>`;
+        return;
+      }
+      const key = state.chartMetric;
+      const sorted = [...rows].sort((a, b) => Number(b[key] ?? -Infinity) - Number(a[key] ?? -Infinity));
+      const width = 1380;
+      const rowH = 38;
+      const top = 26;
+      const left = 280;
+      const right = 116;
+      const height = top + sorted.length * rowH + 28;
+      const values = sorted.map(row => Number(row[key] ?? 0));
+      const min = Math.min(0, ...values);
+      const max = Math.max(...values);
+      const span = Math.max(0.0001, max - min);
+      const axisX = left + (0 - min) / span * (width - left - right);
+      const type = metricFormatFor(key);
+      const bars = sorted.map((row, index) => {
+        const value = Number(row[key] ?? 0);
+        const y = top + index * rowH;
+        const xValue = left + (value - min) / span * (width - left - right);
+        const x = Math.min(axisX, xValue);
+        const barW = Math.max(3, Math.abs(xValue - axisX));
+        const color = value >= 0 ? "var(--accent)" : "var(--red)";
+        const selectedClass = row.Strategy === state.selected ? `stroke="var(--ink)" stroke-width="2"` : "";
+        return `<g role="button" tabindex="0" data-strategy="${esc(row.Strategy)}">
+          <text class="bar-label" x="14" y="${y + 23}">${esc(row.Strategy)}</text>
+          <rect x="${x}" y="${y + 8}" width="${barW}" height="21" rx="6" fill="${color}" ${selectedClass}></rect>
+          <text class="bar-value" x="${Math.max(xValue, axisX) + 10}" y="${y + 24}">${esc(fmtMetric(value, type))}</text>
+        </g>`;
+      }).join("");
+      host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="策略排行图">
+        <line x1="${axisX}" y1="12" x2="${axisX}" y2="${height - 14}" stroke="var(--line)" />
+        ${bars}
+      </svg>`;
+      host.querySelectorAll("[data-strategy]").forEach(group => {
+        group.addEventListener("click", () => {
+          state.selected = group.dataset.strategy;
+          sync();
+        });
+      });
+    }
+
+    function renderScatter(rows) {
+      const host = document.getElementById("scatterChart");
+      if (!rows.length) {
+        host.innerHTML = `<div class="empty-state">没有数据可画。</div>`;
+        return;
+      }
+      const width = 1280;
+      const height = 640;
+      const pad = { left: 76, right: 36, top: 42, bottom: 66 };
+      const xs = rows.map(row => Number(row.Volatility ?? 0));
+      const ys = rows.map(row => Number(row.CAGR ?? 0));
+      const minX = Math.max(0, Math.min(...xs) * 0.88);
+      const maxX = Math.max(...xs) * 1.08;
+      const minY = Math.min(0, Math.min(...ys) * 0.9);
+      const maxY = Math.max(...ys) * 1.12;
+      const xScale = value => pad.left + (value - minX) / Math.max(0.0001, maxX - minX) * (width - pad.left - pad.right);
+      const yScale = value => height - pad.bottom - (value - minY) / Math.max(0.0001, maxY - minY) * (height - pad.top - pad.bottom);
+      const xTicks = Array.from({ length: 5 }, (_, index) => minX + (maxX - minX) * index / 4);
+      const yTicks = Array.from({ length: 5 }, (_, index) => minY + (maxY - minY) * index / 4);
+      const grid = [
+        ...xTicks.map(value => `<g><line class="line-grid" x1="${xScale(value)}" y1="${pad.top}" x2="${xScale(value)}" y2="${height - pad.bottom}" /><text class="axis-label" x="${xScale(value)}" y="${height - 24}" text-anchor="middle">${fmtPct(value)}</text></g>`),
+        ...yTicks.map(value => `<g><line class="line-grid" x1="${pad.left}" y1="${yScale(value)}" x2="${width - pad.right}" y2="${yScale(value)}" /><text class="axis-label" x="${pad.left - 12}" y="${yScale(value) + 4}" text-anchor="end">${fmtPct(value)}</text></g>`)
+      ].join("");
+      const points = rows.map(row => {
+        const drawdown = Math.abs(Number(row["Max Drawdown"] ?? 0));
+        const radius = 8 + Math.min(18, Math.max(0, Number(row["Final Equity"] ?? 0) / 10000000));
+        const color = drawdown > 0.65 ? "var(--red)" : drawdown > 0.5 ? "var(--orange)" : "var(--accent)";
+        const selected = row.Strategy === state.selected;
+        return `<g role="button" tabindex="0" data-strategy="${esc(row.Strategy)}">
+          <circle cx="${xScale(Number(row.Volatility ?? 0))}" cy="${yScale(Number(row.CAGR ?? 0))}" r="${selected ? radius + 2 : radius}" fill="${color}" opacity="${selected ? 0.96 : 0.72}" stroke="${selected ? "var(--ink)" : "white"}" stroke-width="${selected ? 2 : 1.5}">
+            <title>${esc(row.Strategy)} · 年化 ${fmtPct(row.CAGR)} · 波动 ${fmtPct(row.Volatility)} · 回撤 ${fmtPct(row["Max Drawdown"])}</title>
+          </circle>
+          ${selected ? `<text class="point-label" x="${xScale(Number(row.Volatility ?? 0)) + 14}" y="${yScale(Number(row.CAGR ?? 0)) - 12}">${esc(row.Strategy)}</text>` : ""}
+        </g>`;
+      }).join("");
+      host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="风险收益散点图">
+        ${grid}
+        <line class="line-axis" x1="${pad.left}" y1="${height - pad.bottom}" x2="${width - pad.right}" y2="${height - pad.bottom}" />
+        <line class="line-axis" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${height - pad.bottom}" />
+        <text class="axis-label" x="${width / 2 - 36}" y="${height - 12}">波动率</text>
+        <text class="axis-label" x="20" y="24">年化收益</text>
+        ${points}
+      </svg>`;
+      host.querySelectorAll("[data-strategy]").forEach(group => {
+        group.addEventListener("click", () => {
+          state.selected = group.dataset.strategy;
+          sync();
+        });
+      });
+    }
+
+    function renderHeatmap(rows) {
+      const host = document.getElementById("heatmap");
+      if (!rows.length) {
+        host.innerHTML = `<div class="empty-state">没有数据可展示。</div>`;
+        return;
+      }
+      const periods = ["1Y CAGR", "3Y CAGR", "5Y CAGR", "7Y CAGR", "10Y CAGR"];
+      const values = rows.flatMap(row => periods.map(period => Number(row[period] ?? 0)));
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const colorFor = value => {
+        const t = (Number(value ?? 0) - min) / Math.max(0.0001, max - min);
+        const light = 94 - t * 28;
+        const sat = 32 + t * 26;
+        return `hsl(158, ${sat}%, ${light}%)`;
+      };
+      const header = `<div class="heat-row">
+        <div class="heat-cell heat-head heat-name">策略</div>
+        ${periods.map(period => `<div class="heat-cell heat-head">${period.replace(" CAGR", "")}</div>`).join("")}
+      </div>`;
+      const body = rows.map(row => `<div class="heat-row">
+        <button class="heat-cell heat-name" type="button" data-strategy="${esc(row.Strategy)}">${esc(row.Strategy)}</button>
+        ${periods.map(period => `<div class="heat-cell" style="background:${colorFor(row[period])}">${fmtPct(row[period])}</div>`).join("")}
+      </div>`).join("");
+      host.innerHTML = header + body;
+      host.querySelectorAll("[data-strategy]").forEach(button => {
+        button.addEventListener("click", () => {
+          state.selected = button.dataset.strategy;
+          sync();
+        });
+      });
+    }
+
+    function renderImages() {
+      const tabs = document.getElementById("imageTabs");
+      tabs.innerHTML = REPORT_META.chartImages.map((image, index) => (
+        `<button class="metric-chip ${state.imageIndex === index ? "active" : ""}" type="button" data-image-index="${index}">${esc(image.label)}</button>`
+      )).join("");
+      tabs.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => {
+          state.imageIndex = Number(button.dataset.imageIndex);
+          renderImages();
+        });
+      });
+      const image = REPORT_META.chartImages[state.imageIndex] || REPORT_META.chartImages[0];
+      const element = document.getElementById("chartImage");
+      element.src = image.src;
+      element.alt = image.label;
+    }
+
+    function sync() {
+      state.view = getViewFromHash();
+      const rows = getFilteredRows();
+      if (state.selected && !rows.some(row => row.Strategy === state.selected)) {
+        state.selected = rows[0]?.Strategy || null;
+      }
+      renderControls(rows);
+      syncView();
+      renderInteractiveLineChart(rows);
+      renderBarChart(rows);
+      renderScatter(rows);
+      renderHeatmap(rows);
+      renderImages();
+    }
+
+    function resetFilters() {
+      state.filter = "all";
+      state.search = "";
+      state.minCagr = 0;
+      state.maxDrawdown = 0.9;
+      state.beatQqq = false;
+      state.betterDd = false;
+      state.hiddenSeries = {};
+      document.getElementById("searchInput").value = "";
+      document.getElementById("minCagr").value = "0";
+      document.getElementById("maxDrawdown").value = "90";
+      document.getElementById("beatQqqToggle").checked = false;
+      document.getElementById("betterDdToggle").checked = false;
+      sync();
+    }
+
+    function bindInputs() {
+      document.getElementById("searchInput").addEventListener("input", event => {
+        state.search = event.target.value;
+        sync();
+      });
+      document.getElementById("minCagr").addEventListener("input", event => {
+        state.minCagr = Number(event.target.value) / 100;
+        sync();
+      });
+      document.getElementById("maxDrawdown").addEventListener("input", event => {
+        state.maxDrawdown = Number(event.target.value) / 100;
+        sync();
+      });
+      document.getElementById("beatQqqToggle").addEventListener("change", event => {
+        state.beatQqq = event.target.checked;
+        sync();
+      });
+      document.getElementById("betterDdToggle").addEventListener("change", event => {
+        state.betterDd = event.target.checked;
+        sync();
+      });
+      document.getElementById("resetFilters").addEventListener("click", resetFilters);
+      window.addEventListener("hashchange", sync);
+    }
+
+    if (!location.hash) {
+      history.replaceState(null, "", "#curves");
+    }
+    renderMeta();
+    bindInputs();
     sync();
   </script>
 </body>
