@@ -37,7 +37,7 @@ STRATEGY_DESCRIPTIONS = {
     "momentum_rotation_2x": "动量轮动增强版，进攻资产使用合成 2x，防守资产不加杠杆。",
     "breakout_3x_with_stop": "寻找接近 252 日新高的突破行情，趋势转弱时逐级降杠杆。",
     "crash_protected_tqqq": "仅在 QQQ 高于 200 日均线且均线向上时使用合成 3x QQQ。",
-    "ema5_tqqq_trend": "QQQ 沿 5 日 EMA 上行时持有 TQQQ，跌破 EMA5 后切到 SHY。",
+    "ema5_tqqq_trend": "QQQ 沿 5 日 EMA 上行且 200 日均线上行时持有 TQQQ，否则切到 SHY。",
     "adaptive_leverage_score": "综合趋势、动量、回撤和波动率打分，动态决定 1x/2x/3x 或防守。",
     "dca_leverage_boost": "只调整每月新增资金，强牛市买 3x，普通牛市买 2x，熊市转防守组合。",
 }
@@ -325,7 +325,9 @@ def _strategy_implementation(name: str, config: dict[str, Any]) -> str:
     if strategy_type == "ema5_tqqq_trend":
         return (
             f"每日检查 `{config.get('signal_asset', 'QQQ')}` 是否站上 {config.get('ema_window', 5)} 日 EMA，且 EMA 在 "
-            f"{config.get('slope_lookback', 1)} 日窗口内上行；满足时持有 `{config.get('risk_on_asset', 'QQQ_3X')}`，"
+            f"{config.get('ema_slope_lookback', config.get('slope_lookback', 1))} 日窗口内上行；同时要求 "
+            f"{config.get('long_ma_window', 200)} 日均线在 {config.get('long_ma_slope_lookback', 1)} 日窗口内上行；"
+            f"满足时持有 `{config.get('risk_on_asset', 'QQQ_3X')}`，"
             f"否则切到 `{config.get('risk_off_asset', 'SHY')}`。"
         )
     if strategy_type == "adaptive_leverage_score":

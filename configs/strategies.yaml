@@ -265,7 +265,9 @@ ema5_tqqq_trend:
   rebalance_frequency: daily
   signal_asset: QQQ
   ema_window: 5
-  slope_lookback: 1
+  ema_slope_lookback: 1
+  long_ma_window: 200
+  long_ma_slope_lookback: 1
   risk_on_asset: QQQ_3X
   risk_off_asset: SHY
 

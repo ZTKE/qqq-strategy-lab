@@ -63,14 +63,23 @@ class Ema5TqqqTrendStrategy(Strategy):
     def generate_weights(self, prices: pd.DataFrame, current_date: pd.Timestamp) -> dict[str, float]:
         signal_asset = self.config.get("signal_asset", "QQQ")
         ema_window = int(self.config.get("ema_window", 5))
-        slope_lookback = int(self.config.get("slope_lookback", 1))
+        ema_slope_lookback = int(self.config.get("ema_slope_lookback", self.config.get("slope_lookback", 1)))
+        long_ma_window = int(self.config.get("long_ma_window", 200))
+        long_ma_slope_lookback = int(self.config.get("long_ma_slope_lookback", 1))
         risk_on_asset = self.config.get("risk_on_asset", "QQQ_3X")
         risk_off_asset = self.config.get("risk_off_asset", "SHY")
 
         price = _latest_price(prices, signal_asset, current_date)
         ema = _ema_at(prices, signal_asset, current_date, ema_window)
-        ema_rising = _ema_slope_positive(prices, signal_asset, current_date, ema_window, slope_lookback)
-        if pd.notna(price) and pd.notna(ema) and price > ema and ema_rising:
+        ema_rising = _ema_slope_positive(prices, signal_asset, current_date, ema_window, ema_slope_lookback)
+        long_ma_rising = _ma_slope_positive(
+            prices,
+            signal_asset,
+            current_date,
+            long_ma_window,
+            long_ma_slope_lookback,
+        )
+        if pd.notna(price) and pd.notna(ema) and price > ema and ema_rising and long_ma_rising:
             return self.normalize({risk_on_asset: 1.0})
         return self.normalize({risk_off_asset: 1.0})
 
