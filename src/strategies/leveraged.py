@@ -9,6 +9,20 @@ from src.indicators import historical_drawdown_at, moving_average_at, trailing_m
 from src.strategies.base import Strategy
 
 
+_VOL_CACHE: dict[tuple[int, str, int], pd.Series] = {}
+_HIGH_CACHE: dict[tuple[int, str, int], pd.Series] = {}
+_MA_SERIES_CACHE: dict[tuple[int, str, int], pd.Series] = {}
+_EMA_CACHE: dict[tuple[int, str, int], pd.Series] = {}
+
+
+def _series_value_at(series: pd.Series, current_date: pd.Timestamp) -> float:
+    position = series.index.searchsorted(pd.Timestamp(current_date), side="right") - 1
+    if position < 0:
+        return np.nan
+    value = series.iloc[position]
+    return float(value) if pd.notna(value) else np.nan
+
+
 class DailyTrend2xStrategy(Strategy):
     def generate_weights(self, prices: pd.DataFrame, current_date: pd.Timestamp) -> dict[str, float]:
         signal_asset = self.config.get("signal_asset", "QQQ")
@@ -38,6 +52,69 @@ class DailyTrend3xDefensiveStrategy(Strategy):
             return self.normalize({risk_off_asset: 1.0})
         if price > fast_ma and fast_ma > slow_ma:
             return self.normalize({asset_3x: 1.0})
+        if price > slow_ma:
+            return self.normalize({asset_2x: 1.0})
+        if price > fast_ma:
+            return self.normalize({asset_1x: 1.0})
+        return self.normalize({risk_off_asset: 1.0})
+
+
+class Ema5TqqqTrendStrategy(Strategy):
+    def generate_weights(self, prices: pd.DataFrame, current_date: pd.Timestamp) -> dict[str, float]:
+        signal_asset = self.config.get("signal_asset", "QQQ")
+        ema_window = int(self.config.get("ema_window", 5))
+        slope_lookback = int(self.config.get("slope_lookback", 1))
+        risk_on_asset = self.config.get("risk_on_asset", "QQQ_3X")
+        risk_off_asset = self.config.get("risk_off_asset", "SHY")
+
+        price = _latest_price(prices, signal_asset, current_date)
+        ema = _ema_at(prices, signal_asset, current_date, ema_window)
+        ema_rising = _ema_slope_positive(prices, signal_asset, current_date, ema_window, slope_lookback)
+        if pd.notna(price) and pd.notna(ema) and price > ema and ema_rising:
+            return self.normalize({risk_on_asset: 1.0})
+        return self.normalize({risk_off_asset: 1.0})
+
+
+class DailyTrend3xDefensiveV2Strategy(Strategy):
+    def generate_weights(self, prices: pd.DataFrame, current_date: pd.Timestamp) -> dict[str, float]:
+        signal_asset = self.config.get("signal_asset", "QQQ")
+        fast_window = int(self.config.get("fast_window", 50))
+        slow_window = int(self.config.get("slow_window", 200))
+        slope_lookback = int(self.config.get("slope_lookback", 20))
+        vol_window = int(self.config.get("vol_window", 20))
+        low_vol = float(self.config.get("low_vol_threshold", 0.28))
+        high_vol = float(self.config.get("high_vol_threshold", 0.35))
+        soft_drawdown = float(self.config.get("soft_drawdown_threshold", 0.15))
+        hard_drawdown = float(self.config.get("hard_drawdown_threshold", 0.25))
+        max_3x_weight = float(self.config.get("max_3x_weight", 0.8))
+        medium_3x_weight = float(self.config.get("medium_3x_weight", 0.6))
+        asset_1x = self.config.get("asset_1x", "QQQ")
+        asset_2x = self.config.get("asset_2x", "QQQ_2X")
+        asset_3x = self.config.get("asset_3x", "QQQ_3X")
+        risk_off_asset = self.config.get("risk_off_asset", "SHY")
+
+        price = _latest_price(prices, signal_asset, current_date)
+        fast_ma = moving_average_at(prices, signal_asset, current_date, fast_window)
+        slow_ma = moving_average_at(prices, signal_asset, current_date, slow_window)
+        volatility = _realized_volatility(prices, signal_asset, current_date, vol_window)
+        drawdown = historical_drawdown_at(prices, signal_asset, current_date)
+        fast_rising = _ma_slope_positive(prices, signal_asset, current_date, fast_window, slope_lookback)
+        slow_rising = _ma_slope_positive(prices, signal_asset, current_date, slow_window, slope_lookback)
+
+        if any(pd.isna(value) for value in [price, fast_ma, slow_ma, volatility, drawdown]):
+            return self.normalize({risk_off_asset: 1.0})
+        if drawdown >= hard_drawdown:
+            return self.normalize({risk_off_asset: 1.0})
+        if drawdown >= soft_drawdown:
+            if price > slow_ma:
+                return self.normalize({asset_1x: 1.0})
+            return self.normalize({risk_off_asset: 1.0})
+
+        strong_trend = price > fast_ma and fast_ma > slow_ma and fast_rising and slow_rising
+        if strong_trend and volatility <= low_vol:
+            return self.normalize({asset_3x: max_3x_weight, risk_off_asset: 1.0 - max_3x_weight})
+        if strong_trend and volatility <= high_vol:
+            return self.normalize({asset_3x: medium_3x_weight, risk_off_asset: 1.0 - medium_3x_weight})
         if price > slow_ma:
             return self.normalize({asset_2x: 1.0})
         if price > fast_ma:
@@ -271,10 +348,11 @@ class DcaLeverageBoostStrategy(Strategy):
 def _latest_price(prices: pd.DataFrame, asset: str, current_date: pd.Timestamp) -> float:
     if asset not in prices.columns:
         return np.nan
-    history = prices.loc[:current_date, asset].dropna()
-    if history.empty:
+    history = prices[asset].dropna().astype(float)
+    position = history.index.searchsorted(pd.Timestamp(current_date), side="right") - 1
+    if position < 0:
         return np.nan
-    return float(history.iloc[-1])
+    return float(history.iloc[position])
 
 
 def _above_ma(prices: pd.DataFrame, asset: str, current_date: pd.Timestamp, window: int) -> bool:
@@ -286,19 +364,24 @@ def _above_ma(prices: pd.DataFrame, asset: str, current_date: pd.Timestamp, wind
 def _realized_volatility(prices: pd.DataFrame, asset: str, current_date: pd.Timestamp, window: int) -> float:
     if asset not in prices.columns:
         return np.nan
-    returns = prices.loc[:current_date, asset].dropna().pct_change().dropna().tail(window)
-    if len(returns) < max(2, window // 2):
-        return np.nan
-    return float(returns.std(ddof=1) * math.sqrt(252))
+    key = (id(prices), asset, int(window))
+    volatility = _VOL_CACHE.get(key)
+    if volatility is None:
+        returns = prices[asset].dropna().astype(float).pct_change()
+        volatility = returns.rolling(window=window, min_periods=max(2, window // 2)).std(ddof=1) * math.sqrt(252)
+        _VOL_CACHE[key] = volatility
+    return _series_value_at(volatility, current_date)
 
 
 def _rolling_high(prices: pd.DataFrame, asset: str, current_date: pd.Timestamp, window: int) -> float:
     if asset not in prices.columns:
         return np.nan
-    history = prices.loc[:current_date, asset].dropna().tail(window)
-    if len(history) < window:
-        return np.nan
-    return float(history.max())
+    key = (id(prices), asset, int(window))
+    rolling_high = _HIGH_CACHE.get(key)
+    if rolling_high is None:
+        rolling_high = prices[asset].dropna().astype(float).rolling(window=window, min_periods=window).max()
+        _HIGH_CACHE[key] = rolling_high
+    return _series_value_at(rolling_high, current_date)
 
 
 def _ma_slope_positive(
@@ -310,8 +393,56 @@ def _ma_slope_positive(
 ) -> bool:
     if asset not in prices.columns:
         return False
-    history = prices.loc[:current_date, asset].dropna()
-    ma = history.rolling(window=window, min_periods=window).mean().dropna()
-    if len(ma) <= slope_lookback:
+    key = (id(prices), asset, int(window))
+    ma = _MA_SERIES_CACHE.get(key)
+    if ma is None:
+        ma = prices[asset].dropna().astype(float).rolling(window=window, min_periods=window).mean()
+        _MA_SERIES_CACHE[key] = ma
+    current_pos = ma.index.searchsorted(pd.Timestamp(current_date), side="right") - 1
+    if current_pos < slope_lookback:
         return False
-    return float(ma.iloc[-1]) > float(ma.iloc[-1 - slope_lookback])
+    current = ma.iloc[current_pos]
+    previous = ma.iloc[current_pos - slope_lookback]
+    return pd.notna(current) and pd.notna(previous) and float(current) > float(previous)
+
+
+def _ema_at(prices: pd.DataFrame, asset: str, current_date: pd.Timestamp, window: int) -> float:
+    ema = _ema_series(prices, asset, window)
+    if ema is None:
+        return np.nan
+    return _series_value_at(ema, current_date)
+
+
+def _ema_slope_positive(
+    prices: pd.DataFrame,
+    asset: str,
+    current_date: pd.Timestamp,
+    window: int,
+    slope_lookback: int,
+) -> bool:
+    ema = _ema_series(prices, asset, window)
+    if ema is None:
+        return False
+    current_pos = ema.index.searchsorted(pd.Timestamp(current_date), side="right") - 1
+    if current_pos < slope_lookback:
+        return False
+    current = ema.iloc[current_pos]
+    previous = ema.iloc[current_pos - slope_lookback]
+    return pd.notna(current) and pd.notna(previous) and float(current) > float(previous)
+
+
+def _ema_series(prices: pd.DataFrame, asset: str, window: int) -> pd.Series | None:
+    if asset not in prices.columns:
+        return None
+    key = (id(prices), asset, int(window))
+    ema = _EMA_CACHE.get(key)
+    if ema is None:
+        ema = (
+            prices[asset]
+            .dropna()
+            .astype(float)
+            .ewm(span=int(window), adjust=False, min_periods=int(window))
+            .mean()
+        )
+        _EMA_CACHE[key] = ema
+    return ema

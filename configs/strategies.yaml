@@ -122,6 +122,63 @@ daily_trend_3x_defensive:
   asset_3x: QQQ_3X
   risk_off_asset: SHY
 
+daily_trend_3x_defensive_v2_conservative:
+  type: daily_trend_3x_defensive_v2
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  fast_window: 50
+  slow_window: 200
+  slope_lookback: 20
+  vol_window: 20
+  low_vol_threshold: 0.24
+  high_vol_threshold: 0.30
+  soft_drawdown_threshold: 0.12
+  hard_drawdown_threshold: 0.22
+  max_3x_weight: 0.70
+  medium_3x_weight: 0.45
+  asset_1x: QQQ
+  asset_2x: QQQ_2X
+  asset_3x: QQQ_3X
+  risk_off_asset: SHY
+
+daily_trend_3x_defensive_v2_balanced:
+  type: daily_trend_3x_defensive_v2
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  fast_window: 50
+  slow_window: 200
+  slope_lookback: 20
+  vol_window: 20
+  low_vol_threshold: 0.28
+  high_vol_threshold: 0.35
+  soft_drawdown_threshold: 0.15
+  hard_drawdown_threshold: 0.25
+  max_3x_weight: 0.80
+  medium_3x_weight: 0.60
+  asset_1x: QQQ
+  asset_2x: QQQ_2X
+  asset_3x: QQQ_3X
+  risk_off_asset: SHY
+
+daily_trend_3x_defensive_v2_aggressive:
+  type: daily_trend_3x_defensive_v2
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  fast_window: 50
+  slow_window: 200
+  slope_lookback: 20
+  vol_window: 20
+  low_vol_threshold: 0.30
+  high_vol_threshold: 0.38
+  soft_drawdown_threshold: 0.18
+  hard_drawdown_threshold: 0.30
+  max_3x_weight: 1.00
+  medium_3x_weight: 0.75
+  asset_1x: QQQ
+  asset_2x: QQQ_2X
+  asset_3x: QQQ_3X
+  risk_off_asset: SHY
+
 dual_ma_leverage_ladder:
   type: dual_ma_leverage_ladder
   rebalance_frequency: daily
@@ -201,6 +258,15 @@ crash_protected_tqqq:
   slope_lookback: 20
   asset_1x: QQQ
   asset_3x: QQQ_3X
+  risk_off_asset: SHY
+
+ema5_tqqq_trend:
+  type: ema5_tqqq_trend
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  ema_window: 5
+  slope_lookback: 1
+  risk_on_asset: QQQ_3X
   risk_off_asset: SHY
 
 adaptive_leverage_score:

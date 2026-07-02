@@ -28,12 +28,16 @@ STRATEGY_DESCRIPTIONS = {
     "dca_drawdown_boost": "月度定投策略，回撤越深，新投入资金越偏向 QQQ。",
     "daily_trend_2x": "每日趋势检查，牛市持有合成 2x QQQ，弱势切到防守资产。",
     "daily_trend_3x_defensive": "每日 50/200 日均线判断，强趋势用 3x，普通牛市用 2x，弱势防守。",
+    "daily_trend_3x_defensive_v2_conservative": "3x 防守增强保守版：限制 3x 仓位，并用波动率和回撤刹车降低顶部风险。",
+    "daily_trend_3x_defensive_v2_balanced": "3x 防守增强平衡版：保留强趋势进攻，同时加入波动率、均线斜率和回撤刹车。",
+    "daily_trend_3x_defensive_v2_aggressive": "3x 防守增强进攻版：允许满仓 3x，但用波动率和回撤阈值控制极端风险。",
     "dual_ma_leverage_ladder": "用 20/50/200 日均线做杠杆阶梯，趋势越强杠杆越高。",
     "vol_target_trend": "先用 200 日趋势过滤，再根据近 20 日波动率在 1x/2x/3x 间切换。",
     "core_trend_2x": "保留 QQQ 核心仓，战术仓按趋势使用 2x、3x 或 SHY。",
     "momentum_rotation_2x": "动量轮动增强版，进攻资产使用合成 2x，防守资产不加杠杆。",
     "breakout_3x_with_stop": "寻找接近 252 日新高的突破行情，趋势转弱时逐级降杠杆。",
     "crash_protected_tqqq": "仅在 QQQ 高于 200 日均线且均线向上时使用合成 3x QQQ。",
+    "ema5_tqqq_trend": "QQQ 沿 5 日 EMA 上行时持有 TQQQ，跌破 EMA5 后切到 SHY。",
     "adaptive_leverage_score": "综合趋势、动量、回撤和波动率打分，动态决定 1x/2x/3x 或防守。",
     "dca_leverage_boost": "只调整每月新增资金，强牛市买 3x，普通牛市买 2x，熊市转防守组合。",
 }
@@ -107,6 +111,7 @@ def _serialize_interactive_series(results: list[BacktestResult]) -> dict[str, An
         "equity": {},
         "drawdown": {},
         "rolling": {},
+        "performance": {},
     }
     for result in results:
         name = result.strategy_name
@@ -117,6 +122,7 @@ def _serialize_interactive_series(results: list[BacktestResult]) -> dict[str, An
         payload["equity"][name] = _series_points(equity)
         payload["drawdown"][name] = _series_points(_month_end_sample(drawdown))
         payload["rolling"][name] = _series_points(_month_end_sample(rolling.dropna()))
+        payload["performance"][name] = _series_points(performance)
     return payload
 
 
@@ -261,6 +267,18 @@ def _strategy_implementation(name: str, config: dict[str, Any]) -> str:
             f"{config.get('slow_window', 200)} 日均线；强趋势用 `{config.get('asset_3x', 'QQQ_3X')}`，"
             f"普通趋势用 `{config.get('asset_2x', 'QQQ_2X')}`，弱势用 `{config.get('risk_off_asset', 'SHY')}`。"
         )
+    if strategy_type == "daily_trend_3x_defensive_v2":
+        return (
+            f"每日比较 `{config.get('signal_asset', 'QQQ')}` 的 {config.get('fast_window', 50)} / "
+            f"{config.get('slow_window', 200)} 日均线，并要求均线斜率向上才允许 3x；"
+            f"20 日波动率低于 {_fmt_pct(config.get('low_vol_threshold'))} 时最高 "
+            f"{_fmt_pct(config.get('max_3x_weight'))} `{config.get('asset_3x', 'QQQ_3X')}`，"
+            f"波动率低于 {_fmt_pct(config.get('high_vol_threshold'))} 时最高 "
+            f"{_fmt_pct(config.get('medium_3x_weight'))} 3x；"
+            f"`{config.get('signal_asset', 'QQQ')}` 回撤超过 {_fmt_pct(config.get('soft_drawdown_threshold'))} "
+            f"降到 `{config.get('asset_1x', 'QQQ')}`，超过 {_fmt_pct(config.get('hard_drawdown_threshold'))} "
+            f"切到 `{config.get('risk_off_asset', 'SHY')}`。"
+        )
     if strategy_type == "dual_ma_leverage_ladder":
         return (
             f"每日用 {config.get('short_window', 20)} / {config.get('mid_window', 50)} / {config.get('long_window', 200)} "
@@ -303,6 +321,12 @@ def _strategy_implementation(name: str, config: dict[str, Any]) -> str:
             f"每日要求 `{config.get('signal_asset', 'QQQ')}` 高于 {config.get('ma_window', 200)} 日均线，且均线在 "
             f"{config.get('slope_lookback', 20)} 日窗口内向上；满足时用 `{config.get('asset_3x', 'QQQ_3X')}`，"
             f"否则降到 `{config.get('asset_1x', 'QQQ')}` 或 `{config.get('risk_off_asset', 'SHY')}`。"
+        )
+    if strategy_type == "ema5_tqqq_trend":
+        return (
+            f"每日检查 `{config.get('signal_asset', 'QQQ')}` 是否站上 {config.get('ema_window', 5)} 日 EMA，且 EMA 在 "
+            f"{config.get('slope_lookback', 1)} 日窗口内上行；满足时持有 `{config.get('risk_on_asset', 'QQQ_3X')}`，"
+            f"否则切到 `{config.get('risk_off_asset', 'SHY')}`。"
         )
     if strategy_type == "adaptive_leverage_score":
         return (
@@ -825,6 +849,23 @@ HTML_TEMPLATE = r"""<!doctype html>
       line-height: 1.45;
     }
 
+    .run-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .run-status {
+      min-height: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .run-status.error {
+      color: var(--red);
+    }
+
     .main-stack {
       display: grid;
       gap: 16px;
@@ -1135,7 +1176,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 1040px;
+      min-width: 1320px;
     }
 
     th,
@@ -1169,9 +1210,12 @@ HTML_TEMPLATE = r"""<!doctype html>
       left: 0;
       background: inherit;
       z-index: 2;
-      max-width: 260px;
+      width: 280px;
+      min-width: 280px;
+      max-width: 320px;
       white-space: normal;
-      overflow-wrap: anywhere;
+      overflow-wrap: normal;
+      word-break: normal;
     }
 
     th:first-child {
@@ -1197,6 +1241,8 @@ HTML_TEMPLATE = r"""<!doctype html>
       text-decoration: underline;
       text-decoration-style: dotted;
       text-underline-offset: 3px;
+      overflow-wrap: break-word;
+      word-break: normal;
     }
 
     .strategy-tooltip {
@@ -1510,7 +1556,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         <div class="field">
           <div class="section-title">
             <h3>回测参数</h3>
-            <small>填完后重新运行</small>
+            <small>选好后运行运算</small>
           </div>
           <div class="param-grid">
             <div>
@@ -1533,12 +1579,19 @@ HTML_TEMPLATE = r"""<!doctype html>
           <div class="field">
             <label for="runCommand">运行命令</label>
             <div class="command-box" id="runCommand"></div>
-            <button class="button" id="copyCommand" type="button" title="复制这条命令">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 8h10v12H8zM6 16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-              复制命令
-            </button>
+            <div class="run-actions">
+              <button class="button primary" id="runPeriod" type="button" title="按所选日期重新计算页面指标">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                运行运算
+              </button>
+              <button class="button" id="copyCommand" type="button" title="复制这条命令">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 8h10v12H8zM6 16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+                复制命令
+              </button>
+            </div>
+            <div class="run-status" id="runStatus"></div>
           </div>
-          <p class="footnote">当前文件是静态报告，改参数后需要运行上面的命令重新生成结果。</p>
+          <p class="footnote">页面内运算使用已生成的曲线序列；完整刷新数据时仍可复制命令运行。</p>
         </div>
 
         <div class="field">
@@ -1740,6 +1793,9 @@ HTML_TEMPLATE = r"""<!doctype html>
     const REPORT_META = __REPORT_META__;
     const REPORT_ROWS = __REPORT_ROWS__;
     const REPORT_SERIES = __REPORT_SERIES__;
+    const baseRows = REPORT_ROWS.map(row => ({ ...row, Tags: [...(row.Tags || [])] }));
+    let activeRows = baseRows;
+    let activeSeries = REPORT_SERIES;
 
     const state = {
       filter: "all",
@@ -1836,7 +1892,17 @@ HTML_TEMPLATE = r"""<!doctype html>
       ["Required Assets", "资产", "text"]
     ];
 
-    const benchmark = REPORT_ROWS.find(row => row.Strategy === "qqq_buy_hold") || REPORT_ROWS[0];
+    function allRows() {
+      return activeRows || baseRows;
+    }
+
+    function seriesPayload() {
+      return activeSeries || REPORT_SERIES;
+    }
+
+    function benchmarkRow() {
+      return allRows().find(row => row.Strategy === "qqq_buy_hold") || allRows()[0];
+    }
 
     function fmtPct(value) {
       if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
@@ -1901,8 +1967,8 @@ HTML_TEMPLATE = r"""<!doctype html>
     }
 
     function colorForStrategy(strategyName) {
-      const seriesIndex = (REPORT_SERIES.strategies || []).indexOf(strategyName);
-      const rowIndex = REPORT_ROWS.findIndex(row => row.Strategy === strategyName);
+      const seriesIndex = (seriesPayload().strategies || []).indexOf(strategyName);
+      const rowIndex = allRows().findIndex(row => row.Strategy === strategyName);
       const index = seriesIndex >= 0 ? seriesIndex : Math.max(0, rowIndex);
       return lineColors[index % lineColors.length];
     }
@@ -1914,9 +1980,320 @@ HTML_TEMPLATE = r"""<!doctype html>
         .sort((a, b) => a.t - b.t);
     }
 
+    function performancePoints(strategyName, sourceSeries = REPORT_SERIES.performance || REPORT_SERIES.equity || {}) {
+      return parsedSeries(strategyName, sourceSeries);
+    }
+
+    function pointsInRange(points, startDate, endDate) {
+      const start = Date.parse(startDate);
+      const end = Date.parse(endDate);
+      return points.filter(point => point.t >= start && point.t <= end);
+    }
+
+    function sampleMonthEnd(points) {
+      if (!points.length) return [];
+      const sampled = [];
+      let currentMonth = "";
+      let lastInMonth = null;
+      points.forEach(point => {
+        const month = point.d.slice(0, 7);
+        if (currentMonth && month !== currentMonth && lastInMonth) {
+          sampled.push(lastInMonth);
+        }
+        currentMonth = month;
+        lastInMonth = point;
+      });
+      if (lastInMonth) sampled.push(lastInMonth);
+      if (sampled[0]?.d !== points[0].d) sampled.unshift(points[0]);
+      if (sampled[sampled.length - 1]?.d !== points[points.length - 1].d) sampled.push(points[points.length - 1]);
+      const byDate = new Map(sampled.map(point => [point.d, point]));
+      return Array.from(byDate.values()).sort((a, b) => a.t - b.t);
+    }
+
+    function cleanNumber(value) {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    function dailyReturns(points) {
+      const returns = [];
+      for (let index = 1; index < points.length; index += 1) {
+        const previous = points[index - 1].v;
+        const current = points[index].v;
+        if (previous > 0 && Number.isFinite(current)) {
+          returns.push(current / previous - 1);
+        }
+      }
+      return returns;
+    }
+
+    function average(values) {
+      return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : NaN;
+    }
+
+    function sampleStd(values) {
+      if (values.length < 2) return NaN;
+      const mean = average(values);
+      const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1);
+      return Math.sqrt(variance);
+    }
+
+    function maxDrawdownFromPoints(points) {
+      let peak = -Infinity;
+      let maxDrawdown = 0;
+      points.forEach(point => {
+        peak = Math.max(peak, point.v);
+        if (peak > 0) {
+          maxDrawdown = Math.min(maxDrawdown, point.v / peak - 1);
+        }
+      });
+      return maxDrawdown;
+    }
+
+    function yearsBetween(points) {
+      if (points.length < 2) return 0;
+      return Math.max(0, (points[points.length - 1].t - points[0].t) / (365.25 * 24 * 60 * 60 * 1000));
+    }
+
+    function inferredPeriodsPerYear(points, fallback = 252) {
+      const years = yearsBetween(points);
+      if (years <= 0) return fallback;
+      return Math.max(1, (points.length - 1) / years);
+    }
+
+    function performanceSummary(points, periodsPerYear = null) {
+      if (points.length < 2 || points[0].v <= 0 || points[points.length - 1].v <= 0) {
+        return {
+          totalReturn: null,
+          cagr: null,
+          maxDrawdown: null,
+          volatility: null,
+          sharpe: null,
+          calmar: null
+        };
+      }
+      const years = periodsPerYear ? (points.length - 1) / periodsPerYear : yearsBetween(points);
+      const annualization = periodsPerYear || inferredPeriodsPerYear(points);
+      const returns = dailyReturns(points);
+      const volatility = sampleStd(returns) * Math.sqrt(annualization);
+      const cagr = years > 0 ? (points[points.length - 1].v / points[0].v) ** (1 / years) - 1 : NaN;
+      const maxDrawdown = maxDrawdownFromPoints(points);
+      const sharpe = volatility > 0 ? average(returns) * annualization / volatility : NaN;
+      const calmar = maxDrawdown < 0 ? cagr / Math.abs(maxDrawdown) : NaN;
+      return {
+        totalReturn: cleanNumber(points[points.length - 1].v / points[0].v - 1),
+        cagr: cleanNumber(cagr),
+        maxDrawdown: cleanNumber(maxDrawdown),
+        volatility: cleanNumber(volatility),
+        sharpe: cleanNumber(sharpe),
+        calmar: cleanNumber(calmar)
+      };
+    }
+
+    function contributionDay(points, index, mode) {
+      if (index <= 0 || index >= points.length) return false;
+      const month = points[index].d.slice(0, 7);
+      const previousMonth = points[index - 1].d.slice(0, 7);
+      const nextMonth = points[index + 1]?.d.slice(0, 7);
+      if (String(mode || "").toLowerCase() === "dca") {
+        return nextMonth !== month && index < points.length - 1;
+      }
+      return previousMonth !== month;
+    }
+
+    function simulatedEquity(points, row, initialCapital, monthlyContribution) {
+      let equity = Number(initialCapital || 0);
+      let totalInvested = equity;
+      const output = [{ d: points[0].d, t: points[0].t, v: equity }];
+      for (let index = 1; index < points.length; index += 1) {
+        const previous = points[index - 1].v;
+        const dailyReturn = previous > 0 ? points[index].v / previous - 1 : 0;
+        const contribution = contributionDay(points, index, row.Mode) ? Number(monthlyContribution || 0) : 0;
+        equity = equity * (1 + dailyReturn) + contribution;
+        totalInvested += contribution;
+        output.push({ d: points[index].d, t: points[index].t, v: equity });
+      }
+      return {
+        finalEquity: cleanNumber(equity),
+        totalInvested: cleanNumber(totalInvested),
+        points: output
+      };
+    }
+
+    function adjustedPerformancePointsFromEquity(points, row) {
+      if (points.length < 2) return points;
+      const originalInitial = Number(REPORT_META.initialCapital || 20000);
+      const originalMonthly = Number(REPORT_META.monthlyContribution || 0);
+      const output = [{ d: points[0].d, t: points[0].t, v: originalInitial }];
+      for (let index = 1; index < points.length; index += 1) {
+        const previous = points[index - 1].v;
+        const contribution = contributionDay(points, index, row.Mode) ? originalMonthly : 0;
+        const periodReturn = previous > 0 ? (points[index].v - previous - contribution) / previous : 0;
+        const nextValue = output[output.length - 1].v * (1 + periodReturn);
+        output.push({ d: points[index].d, t: points[index].t, v: nextValue });
+      }
+      return output;
+    }
+
+    function drawdownPoints(points) {
+      let peak = -Infinity;
+      return points.map(point => {
+        peak = Math.max(peak, point.v);
+        return { d: point.d, t: point.t, v: peak > 0 ? point.v / peak - 1 : 0 };
+      });
+    }
+
+    function rollingReturnPoints(points, window = 252) {
+      const output = [];
+      for (let index = window; index < points.length; index += 1) {
+        const base = points[index - window].v;
+        if (base > 0) {
+          output.push({ d: points[index].d, t: points[index].t, v: points[index].v / base - 1 });
+        }
+      }
+      return output;
+    }
+
+    function rollingReturnPointsByYears(points, years = 1) {
+      const output = [];
+      for (let index = 1; index < points.length; index += 1) {
+        const cutoff = cutoffDate(points[index].d, years);
+        const basePoint = [...points.slice(0, index)].reverse().find(point => point.d <= cutoff);
+        if (basePoint?.v > 0) {
+          output.push({ d: points[index].d, t: points[index].t, v: points[index].v / basePoint.v - 1 });
+        }
+      }
+      return output;
+    }
+
+    function cutoffDate(endDate, years) {
+      const date = new Date(`${endDate}T00:00:00`);
+      date.setFullYear(date.getFullYear() - years);
+      return date.toISOString().slice(0, 10);
+    }
+
+    function periodWindow(points, years) {
+      const cutoff = cutoffDate(points[points.length - 1].d, years);
+      return points.filter(point => point.d >= cutoff);
+    }
+
+    function computedRow(row, points, initialCapital, monthlyContribution, periodsPerYear = null) {
+      const summary = performanceSummary(points, periodsPerYear);
+      const equity = simulatedEquity(points, row, initialCapital, monthlyContribution);
+      const output = {
+        ...row,
+        "Start Date": points[0].d,
+        "End Date": points[points.length - 1].d,
+        "Total Return": equity.totalInvested > 0 ? cleanNumber(equity.finalEquity / equity.totalInvested - 1) : null,
+        "CAGR": summary.cagr,
+        "Max Drawdown": summary.maxDrawdown,
+        "Volatility": summary.volatility,
+        "Sharpe": summary.sharpe,
+        "Calmar": summary.calmar,
+        "Final Equity": equity.finalEquity,
+        "Total Invested": equity.totalInvested
+      };
+      [1, 3, 5, 7, 10].forEach(year => {
+        const window = periodWindow(points, year);
+        const period = window.length >= 2 ? performanceSummary(window, periodsPerYear) : {};
+        output[`${year}Y Total Return`] = period.totalReturn ?? null;
+        output[`${year}Y CAGR`] = period.cagr ?? null;
+        output[`${year}Y MaxDD`] = period.maxDrawdown ?? null;
+        output[`${year}Y Volatility`] = period.volatility ?? null;
+        output[`${year}Y Sharpe`] = period.sharpe ?? null;
+        output[`${year}Y Calmar`] = period.calmar ?? null;
+      });
+      return { row: output, equity };
+    }
+
+    function setRunStatus(message, isError = false) {
+      const element = document.getElementById("runStatus");
+      if (!element) return;
+      element.textContent = message;
+      element.classList.toggle("error", isError);
+    }
+
+    function numericParam(id, fallback) {
+      const value = Number(document.getElementById(id).value);
+      return Number.isFinite(value) ? value : Number(fallback || 0);
+    }
+
+    function resetPeriodComputation(message = "") {
+      activeRows = baseRows;
+      activeSeries = REPORT_SERIES;
+      if (state.selected && !activeRows.some(row => row.Strategy === state.selected)) {
+        state.selected = null;
+      }
+      setRunStatus(message);
+      sync();
+    }
+
+    function runPeriodComputation() {
+      renderRunCommand();
+      const start = document.getElementById("paramStart").value || REPORT_META.startDate;
+      const end = document.getElementById("paramEnd").value || REPORT_META.endDate;
+      const initial = numericParam("paramInitial", REPORT_META.initialCapital);
+      const monthly = numericParam("paramMonthly", REPORT_META.monthlyContribution);
+      const startTime = Date.parse(start);
+      const endTime = Date.parse(end);
+      if (Number.isNaN(startTime) || Number.isNaN(endTime) || startTime > endTime) {
+        setRunStatus("日期区间无效。", true);
+        return;
+      }
+      const sourceSeries = REPORT_SERIES.performance || REPORT_SERIES.equity;
+      const usingSampledSeries = !REPORT_SERIES.performance;
+      const periodsPerYear = usingSampledSeries ? null : 252;
+      if (!sourceSeries) {
+        setRunStatus("当前报告缺少可用曲线序列，请重新生成报告。", true);
+        return;
+      }
+      if (
+        start === REPORT_META.startDate &&
+        end === REPORT_META.endDate &&
+        initial === Number(REPORT_META.initialCapital || 0) &&
+        monthly === Number(REPORT_META.monthlyContribution || 0)
+      ) {
+        resetPeriodComputation("已恢复完整报告区间。");
+        return;
+      }
+
+      const nextRows = [];
+      const nextSeries = {
+        strategies: [],
+        equity: {},
+        drawdown: {},
+        rolling: {},
+        performance: sourceSeries
+      };
+
+      baseRows.forEach(row => {
+        const rawPoints = pointsInRange(performancePoints(row.Strategy, sourceSeries), start, end);
+        if (rawPoints.length < 2) return;
+        const points = usingSampledSeries ? adjustedPerformancePointsFromEquity(rawPoints, row) : rawPoints;
+        const result = computedRow(row, points, initial, monthly, periodsPerYear);
+        nextRows.push(result.row);
+        nextSeries.strategies.push(row.Strategy);
+        nextSeries.equity[row.Strategy] = sampleMonthEnd(result.equity.points);
+        nextSeries.drawdown[row.Strategy] = sampleMonthEnd(drawdownPoints(points));
+        nextSeries.rolling[row.Strategy] = sampleMonthEnd(usingSampledSeries ? rollingReturnPointsByYears(points) : rollingReturnPoints(points));
+      });
+
+      if (!nextRows.length) {
+        setRunStatus("所选区间没有足够数据。", true);
+        return;
+      }
+      activeRows = nextRows;
+      activeSeries = nextSeries;
+      if (state.selected && !activeRows.some(row => row.Strategy === state.selected)) {
+        state.selected = activeRows[0]?.Strategy || null;
+      }
+      setRunStatus(`已按 ${start} 至 ${end} 重算 ${nextRows.length} 个策略${usingSampledSeries ? "，使用当前报告曲线序列" : ""}。`);
+      sync();
+    }
+
     function getFilteredRows() {
       const query = state.search.trim().toLowerCase();
-      const rows = REPORT_ROWS.filter(row => {
+      const benchmark = benchmarkRow();
+      const rows = allRows().filter(row => {
         const tags = row.Tags || [];
         const text = `${row.Strategy} ${row["Required Assets"]} ${tags.join(" ")}`.toLowerCase();
         if (state.filter !== "all" && !tags.includes(state.filter)) return false;
@@ -1976,8 +2353,13 @@ HTML_TEMPLATE = r"""<!doctype html>
     function renderRunForm() {
       document.getElementById("paramStart").value = REPORT_META.startDate || "";
       document.getElementById("paramEnd").value = REPORT_META.endDate || "";
+      document.getElementById("paramStart").min = REPORT_META.startDate || "";
+      document.getElementById("paramStart").max = REPORT_META.endDate || "";
+      document.getElementById("paramEnd").min = REPORT_META.startDate || "";
+      document.getElementById("paramEnd").max = REPORT_META.endDate || "";
       document.getElementById("paramInitial").value = Math.round(Number(REPORT_META.initialCapital || 0));
       document.getElementById("paramMonthly").value = Math.round(Number(REPORT_META.monthlyContribution || 0));
+      setRunStatus("");
       renderRunCommand();
     }
 
@@ -2107,6 +2489,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         return;
       }
       state.selected = selected.Strategy;
+      const benchmark = benchmarkRow();
       const qqqCagrDelta = benchmark ? selected.CAGR - benchmark.CAGR : null;
       const qqqDdDelta = benchmark ? selected["Max Drawdown"] - benchmark["Max Drawdown"] : null;
       host.innerHTML = `<div class="detail-layout">
@@ -2127,9 +2510,13 @@ HTML_TEMPLATE = r"""<!doctype html>
       </div>`;
     }
 
-    function renderMethodPanel() {
+    function renderMethodPanel(rows) {
       const host = document.getElementById("methodPanel");
-      host.innerHTML = REPORT_ROWS.map(row => `<button class="method-item ${row.Strategy === state.selected ? "selected" : ""}" type="button" data-strategy="${esc(row.Strategy)}">
+      if (!rows.length) {
+        host.innerHTML = `<div class="empty-state">没有可展示的策略。调整左侧筛选条件试试。</div>`;
+        return;
+      }
+      host.innerHTML = rows.map(row => `<button class="method-item ${row.Strategy === state.selected ? "selected" : ""}" type="button" data-strategy="${esc(row.Strategy)}">
         <div>
           <div class="method-name">${esc(row.Strategy)}</div>
           <div class="method-meta">${esc(row["Rebalance Frequency"] || "monthly")} · ${esc((row.Tags || []).join(" / "))}</div>
@@ -2149,7 +2536,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     function renderInteractiveLineChart(rows) {
       const chartHost = document.getElementById("interactiveLineChart");
       const legendHost = document.getElementById("lineLegend");
-      const seriesByStrategy = REPORT_SERIES[state.curveMode] || {};
+      const seriesByStrategy = seriesPayload()[state.curveMode] || {};
       const strategies = rows
         .map(row => row.Strategy)
         .filter(strategy => (seriesByStrategy[strategy] || []).length);
@@ -2442,7 +2829,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     }
 
     function rowForStrategy(strategyName) {
-      return REPORT_ROWS.find(row => row.Strategy === strategyName);
+      return allRows().find(row => row.Strategy === strategyName);
     }
 
     function tooltipHtml(row) {
@@ -2550,7 +2937,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     }
 
     function renderCounts(rows) {
-      document.getElementById("resultCount").textContent = `${rows.length} / ${REPORT_ROWS.length}`;
+      document.getElementById("resultCount").textContent = `${rows.length} / ${allRows().length}`;
       document.getElementById("minCagrValue").textContent = fmtPct(state.minCagr);
       document.getElementById("maxDrawdownValue").textContent = fmtPct(-state.maxDrawdown);
     }
@@ -2564,7 +2951,7 @@ HTML_TEMPLATE = r"""<!doctype html>
       renderCounts(rows);
       renderKpis(rows);
       renderDetail(rows);
-      renderMethodPanel();
+      renderMethodPanel(rows);
       renderInteractiveLineChart(rows);
       renderBarChart(rows);
       renderScatter(rows);
@@ -2649,7 +3036,10 @@ HTML_TEMPLATE = r"""<!doctype html>
         sync();
       });
       ["paramStart", "paramEnd", "paramInitial", "paramMonthly"].forEach(id => {
-        document.getElementById(id).addEventListener("input", renderRunCommand);
+        document.getElementById(id).addEventListener("input", () => {
+          renderRunCommand();
+          setRunStatus("参数已修改，点击运行运算。");
+        });
       });
       document.querySelectorAll(".chart-panel [data-chart-toggle]").forEach(button => {
         button.addEventListener("click", () => {
@@ -2658,6 +3048,7 @@ HTML_TEMPLATE = r"""<!doctype html>
       });
       document.getElementById("resetFilters").addEventListener("click", resetFilters);
       document.getElementById("downloadCsv").addEventListener("click", downloadCsv);
+      document.getElementById("runPeriod").addEventListener("click", runPeriodComputation);
       document.getElementById("copyCommand").addEventListener("click", copyRunCommand);
     }
 

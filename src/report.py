@@ -485,6 +485,8 @@ def _strategy_method_text(config: dict) -> str:
         return "每日寻找接近 252 日新高的强趋势突破；接近新高且趋势强时用 3x，趋势变弱逐级降到 2x、1x 或 SHY。"
     if strategy_type == "crash_protected_tqqq":
         return "每日检查 QQQ 是否高于 200 日均线且 200 日均线向上；满足时用合成 3x QQQ，否则降到 1x 或 SHY。"
+    if strategy_type == "ema5_tqqq_trend":
+        return "每日检查 QQQ 是否站上 5 日 EMA 且 EMA5 上行；满足时持有合成 3x QQQ/TQQQ，跌破 EMA5 或 EMA 转弱时切到 SHY。"
     if strategy_type == "adaptive_leverage_score":
         return "每日用趋势、均线结构、6 个月动量、回撤和波动率打分；高分用 3x，中高分用 2x，中等用 1x，低分切 SHY。"
     if strategy_type == "dca_leverage_boost":

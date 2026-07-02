@@ -65,8 +65,16 @@ class FredRateLoader:
             series = data["Value"]
         else:
             series = data.iloc[:, 0]
-        series = pd.to_numeric(series, errors="coerce").dropna() / 100.0
+        series = self._normalize_rate_units(pd.to_numeric(series, errors="coerce").dropna())
         series.name = series_id
+        return series
+
+    def _normalize_rate_units(self, series: pd.Series) -> pd.Series:
+        if series.empty:
+            return series
+        # Project-written caches store decimal rates; raw FRED values are percentage points.
+        if series.abs().max() > 1.0:
+            return series / 100.0
         return series
 
     def _filter_date_range(self, series: pd.Series, start: str, end: str | None) -> pd.Series:
