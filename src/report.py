@@ -108,7 +108,7 @@ def _build_markdown_summary(
     benchmark_row = benchmark.iloc[0]
     first_meta = results[0].metadata if results else {}
     initial_capital = float(first_meta.get("initial_capital", 20000.0))
-    monthly_contribution = float(first_meta.get("monthly_contribution", 3000.0))
+    monthly_contribution = float(first_meta.get("monthly_contribution", 1000.0))
     leverage_costs = first_meta.get("synthetic_leverage_costs", {})
 
     lines = [

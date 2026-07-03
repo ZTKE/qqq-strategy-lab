@@ -4,7 +4,7 @@
 
 本项目仅用于研究和回测。它不会下单，不会连接券商 API，也不构成投资建议。历史结果不代表未来收益。
 
-默认资金口径：所有策略首日投入 20000 美元，之后每月追加 3000 美元。收益率、CAGR、回撤、波动率和夏普比率使用现金流调整后的收益曲线计算，最终净值展示真实账户资产。
+默认资金口径：所有策略首日投入 20000 美元，之后每月追加 1000 美元。收益率、CAGR、回撤、波动率和夏普比率使用现金流调整后的收益曲线计算，最终净值展示真实账户资产。
 
 ## 安装
 
@@ -44,7 +44,6 @@ pytest
 
 - `qqq_buy_hold`：100% 持有 QQQ。
 - `qqq_80_spy_20`：每月再平衡，80% QQQ / 20% SPY。
-- `qqq_70_spy_20_shy_10`：每月再平衡，70% QQQ / 20% SPY / 10% SHY。
 - `trend_200dma`：基于 QQQ 200 日均线的风险控制策略。
 - `core_trend`：60% 核心 QQQ 仓位，加 40% 趋势策略仓位。
 - `drawdown_buy`：QQQ 回撤越深，越提高 QQQ 配置比例。
@@ -52,14 +51,22 @@ pytest
 - `dca_drawdown_boost`：月度定投策略，在回撤期间提高新增资金中 QQQ 的买入比例。
 - `daily_trend_2x`：每日趋势检查，QQQ 高于 200 日均线时持有合成 2x QQQ，否则切到 SHY/现金。
 - `daily_trend_3x_defensive`：每日 50/200 日均线检查，强趋势用合成 3x QQQ，普通牛市用 2x，弱势防守。
-- `dual_ma_leverage_ladder`：每日 20/50/200 日均线阶梯判断，趋势越强杠杆越高。
 - `vol_target_trend`：每日趋势过滤后，根据近 20 日波动率在 1x/2x/3x 间切换。
 - `core_trend_2x`：保留 QQQ 核心仓，战术仓用 2x/3x 或 SHY。
 - `momentum_rotation_2x`：动量轮动增强版，进攻资产使用合成 2x，防守资产不加杠杆。
 - `breakout_3x_with_stop`：接近 252 日新高且趋势强时使用合成 3x，趋势转弱逐级降杠杆。
 - `crash_protected_tqqq`：仅在 QQQ 高于 200 日均线且均线向上时持有合成 3x QQQ。
 - `adaptive_leverage_score`：用趋势、动量、波动、回撤综合打分决定 1x/2x/3x/防守。
-- `dca_leverage_boost`：只调整每月新增资金，牛市用 2x/3x，弱势转防守。
+
+已在配置中注释保留、默认不参与回测的冗余/参数试验策略：
+
+- `qqq_70_spy_20_shy_10`
+- `daily_trend_3x_defensive_v2_conservative`
+- `daily_trend_3x_defensive_v2_balanced`
+- `daily_trend_3x_defensive_v2_aggressive`
+- `dual_ma_leverage_ladder`
+- `ema5_tqqq_trend`
+- `dca_leverage_boost`
 
 ## 输出文件
 

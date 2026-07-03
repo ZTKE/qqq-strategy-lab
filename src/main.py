@@ -10,6 +10,7 @@ import yaml
 
 from src.backtest import BacktestEngine
 from src.data_loader import DataLoader
+from src.leverage_analysis import write_tqqq_qqq_analysis
 from src.rate_loader import FredRateLoader
 from src.report import generate_report
 from src.strategies import build_strategy
@@ -17,7 +18,7 @@ from src.strategies import build_strategy
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INITIAL_CAPITAL = 20000.0
-DEFAULT_MONTHLY_CONTRIBUTION = 3000.0
+DEFAULT_MONTHLY_CONTRIBUTION = 1000.0
 DEFAULT_TRANSACTION_COST = 0.0005
 DEFAULT_SYNTHETIC_LEVERAGE_COSTS = {
     "annual_management_fee": 0.0,
@@ -32,7 +33,7 @@ DEFAULT_SYNTHETIC_LEVERAGE_COSTS = {
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run QQQ Strategy Lab backtests.")
-    parser.add_argument("--start", default="1971-01-01", help="Download start date, YYYY-MM-DD.")
+    parser.add_argument("--start", default="1970-01-01", help="Download start date, YYYY-MM-DD.")
     parser.add_argument("--end", default=None, help="Inclusive end date, YYYY-MM-DD. Defaults to latest available data.")
     parser.add_argument("--initial-capital", type=float, default=DEFAULT_INITIAL_CAPITAL, help="Initial investment amount.")
     parser.add_argument(
@@ -63,7 +64,7 @@ def main() -> None:
 
 
 def run_backtests(
-    start: str = "1971-01-01",
+    start: str = "1970-01-01",
     end: str | None = None,
     force_refresh: bool = False,
     initial_capital: float = DEFAULT_INITIAL_CAPITAL,
@@ -127,7 +128,7 @@ def run_backtests(
         result.metadata["dynamic_financing_rates"] = financing_rates is not None and not financing_rates.empty
         results.append(result)
 
-    return generate_report(
+    results_frame = generate_report(
         results=results,
         reports_dir=PROJECT_ROOT / "reports",
         start_date=min(result.equity_curve.index[0] for result in results),
@@ -136,6 +137,14 @@ def run_backtests(
         leverage_calibration=leverage_calibration,
         proxy_summary=proxy_summary,
     )
+    write_tqqq_qqq_analysis(
+        prices=prices,
+        reports_dir=PROJECT_ROOT / "reports",
+        leverage_costs=leverage_costs,
+        financing_rates=financing_rates,
+        requested_start=start,
+    )
+    return results_frame
 
 
 def _load_yaml(path: Path) -> dict:

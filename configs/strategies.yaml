@@ -3,10 +3,15 @@ qqq_buy_hold:
   weights:
     QQQ: 1.0
 
-tqqq_buy_hold:
+real_tqqq_buy_hold_2010:
   type: buy_and_hold
   weights:
     TQQQ: 1.0
+
+tqqq_synthetic_buy_hold:
+  type: buy_and_hold
+  weights:
+    QQQ_3X: 1.0
 
 qqq_80_spy_20:
   type: static_allocation
@@ -14,12 +19,13 @@ qqq_80_spy_20:
     QQQ: 0.8
     SPY: 0.2
 
-qqq_70_spy_20_shy_10:
-  type: static_allocation
-  weights:
-    QQQ: 0.7
-    SPY: 0.2
-    SHY: 0.1
+# Disabled as redundant with qqq_80_spy_20 plus defensive trend strategies.
+# qqq_70_spy_20_shy_10:
+#   type: static_allocation
+#   weights:
+#     QQQ: 0.7
+#     SPY: 0.2
+#     SHY: 0.1
 
 trend_200dma:
   type: trend_200dma
@@ -82,7 +88,7 @@ momentum_rotation:
 dca_drawdown_boost:
   type: dca
   initial_capital: 20000
-  monthly_contribution: 3000
+  monthly_contribution: 1000
   signal_asset: QQQ
   normal_weights:
     QQQ: 0.7
@@ -122,74 +128,75 @@ daily_trend_3x_defensive:
   asset_3x: QQQ_3X
   risk_off_asset: SHY
 
-daily_trend_3x_defensive_v2_conservative:
-  type: daily_trend_3x_defensive_v2
-  rebalance_frequency: daily
-  signal_asset: QQQ
-  fast_window: 50
-  slow_window: 200
-  slope_lookback: 20
-  vol_window: 20
-  low_vol_threshold: 0.24
-  high_vol_threshold: 0.30
-  soft_drawdown_threshold: 0.12
-  hard_drawdown_threshold: 0.22
-  max_3x_weight: 0.70
-  medium_3x_weight: 0.45
-  asset_1x: QQQ
-  asset_2x: QQQ_2X
-  asset_3x: QQQ_3X
-  risk_off_asset: SHY
-
-daily_trend_3x_defensive_v2_balanced:
-  type: daily_trend_3x_defensive_v2
-  rebalance_frequency: daily
-  signal_asset: QQQ
-  fast_window: 50
-  slow_window: 200
-  slope_lookback: 20
-  vol_window: 20
-  low_vol_threshold: 0.28
-  high_vol_threshold: 0.35
-  soft_drawdown_threshold: 0.15
-  hard_drawdown_threshold: 0.25
-  max_3x_weight: 0.80
-  medium_3x_weight: 0.60
-  asset_1x: QQQ
-  asset_2x: QQQ_2X
-  asset_3x: QQQ_3X
-  risk_off_asset: SHY
-
-daily_trend_3x_defensive_v2_aggressive:
-  type: daily_trend_3x_defensive_v2
-  rebalance_frequency: daily
-  signal_asset: QQQ
-  fast_window: 50
-  slow_window: 200
-  slope_lookback: 20
-  vol_window: 20
-  low_vol_threshold: 0.30
-  high_vol_threshold: 0.38
-  soft_drawdown_threshold: 0.18
-  hard_drawdown_threshold: 0.30
-  max_3x_weight: 1.00
-  medium_3x_weight: 0.75
-  asset_1x: QQQ
-  asset_2x: QQQ_2X
-  asset_3x: QQQ_3X
-  risk_off_asset: SHY
-
-dual_ma_leverage_ladder:
-  type: dual_ma_leverage_ladder
-  rebalance_frequency: daily
-  signal_asset: QQQ
-  short_window: 20
-  mid_window: 50
-  long_window: 200
-  asset_1x: QQQ
-  asset_2x: QQQ_2X
-  asset_3x: QQQ_3X
-  risk_off_asset: SHY
+# Disabled as parameter-sweep variants of daily_trend_3x_defensive / vol_target_trend.
+# daily_trend_3x_defensive_v2_conservative:
+#   type: daily_trend_3x_defensive_v2
+#   rebalance_frequency: daily
+#   signal_asset: QQQ
+#   fast_window: 50
+#   slow_window: 200
+#   slope_lookback: 20
+#   vol_window: 20
+#   low_vol_threshold: 0.24
+#   high_vol_threshold: 0.30
+#   soft_drawdown_threshold: 0.12
+#   hard_drawdown_threshold: 0.22
+#   max_3x_weight: 0.70
+#   medium_3x_weight: 0.45
+#   asset_1x: QQQ
+#   asset_2x: QQQ_2X
+#   asset_3x: QQQ_3X
+#   risk_off_asset: SHY
+#
+# daily_trend_3x_defensive_v2_balanced:
+#   type: daily_trend_3x_defensive_v2
+#   rebalance_frequency: daily
+#   signal_asset: QQQ
+#   fast_window: 50
+#   slow_window: 200
+#   slope_lookback: 20
+#   vol_window: 20
+#   low_vol_threshold: 0.28
+#   high_vol_threshold: 0.35
+#   soft_drawdown_threshold: 0.15
+#   hard_drawdown_threshold: 0.25
+#   max_3x_weight: 0.80
+#   medium_3x_weight: 0.60
+#   asset_1x: QQQ
+#   asset_2x: QQQ_2X
+#   asset_3x: QQQ_3X
+#   risk_off_asset: SHY
+#
+# daily_trend_3x_defensive_v2_aggressive:
+#   type: daily_trend_3x_defensive_v2
+#   rebalance_frequency: daily
+#   signal_asset: QQQ
+#   fast_window: 50
+#   slow_window: 200
+#   slope_lookback: 20
+#   vol_window: 20
+#   low_vol_threshold: 0.30
+#   high_vol_threshold: 0.38
+#   soft_drawdown_threshold: 0.18
+#   hard_drawdown_threshold: 0.30
+#   max_3x_weight: 1.00
+#   medium_3x_weight: 0.75
+#   asset_1x: QQQ
+#   asset_2x: QQQ_2X
+#   asset_3x: QQQ_3X
+#   risk_off_asset: SHY
+#
+# dual_ma_leverage_ladder:
+#   type: dual_ma_leverage_ladder
+#   rebalance_frequency: daily
+#   signal_asset: QQQ
+#   short_window: 20
+#   mid_window: 50
+#   long_window: 200
+#   asset_1x: QQQ
+#   asset_2x: QQQ_2X
+#   asset_3x: QQQ_3X
+#   risk_off_asset: SHY
 
 vol_target_trend:
   type: vol_target_trend
@@ -260,16 +267,17 @@ crash_protected_tqqq:
   asset_3x: QQQ_3X
   risk_off_asset: SHY
 
-ema5_tqqq_trend:
-  type: ema5_tqqq_trend
-  rebalance_frequency: daily
-  signal_asset: QQQ
-  ema_window: 5
-  ema_slope_lookback: 1
-  long_ma_window: 200
-  long_ma_slope_lookback: 1
-  risk_on_asset: QQQ_3X
-  risk_off_asset: SHY
+# Disabled as a very fast TQQQ timing variant that overlaps crash_protected_tqqq.
+# ema5_tqqq_trend:
+#   type: ema5_tqqq_trend
+#   rebalance_frequency: daily
+#   signal_asset: QQQ
+#   ema_window: 5
+#   ema_slope_lookback: 1
+#   long_ma_window: 200
+#   long_ma_slope_lookback: 1
+#   risk_on_asset: QQQ_3X
+#   risk_off_asset: SHY
 
 adaptive_leverage_score:
   type: adaptive_leverage_score
@@ -286,23 +294,24 @@ adaptive_leverage_score:
   asset_3x: QQQ_3X
   risk_off_asset: SHY
 
-dca_leverage_boost:
-  type: dca_leverage_boost
-  initial_capital: 20000
-  monthly_contribution: 3000
-  signal_asset: QQQ
-  fast_window: 50
-  ma_window: 200
-  normal_weights:
-    QQQ: 0.7
-    SPY: 0.2
-    SHY: 0.1
-  bull_weights:
-    QQQ_2X: 0.8
-    SPY: 0.2
-  strong_bull_weights:
-    QQQ_3X: 0.8
-    SPY: 0.2
-  bear_weights:
-    QQQ: 0.4
-    SHY: 0.6
+# Disabled as redundant with dca_drawdown_boost plus leveraged trend strategies.
+# dca_leverage_boost:
+#   type: dca_leverage_boost
+#   initial_capital: 20000
+#   monthly_contribution: 1000
+#   signal_asset: QQQ
+#   fast_window: 50
+#   ma_window: 200
+#   normal_weights:
+#     QQQ: 0.7
+#     SPY: 0.2
+#     SHY: 0.1
+#   bull_weights:
+#     QQQ_2X: 0.8
+#     SPY: 0.2
+#   strong_bull_weights:
+#     QQQ_3X: 0.8
+#     SPY: 0.2
+#   bear_weights:
+#     QQQ: 0.4
+#     SHY: 0.6

@@ -26,7 +26,7 @@ class BacktestEngine:
         self,
         prices: pd.DataFrame,
         initial_capital: float = 20000.0,
-        monthly_contribution: float = 3000.0,
+        monthly_contribution: float = 1000.0,
         transaction_cost: float = 0.0005,
     ):
         self.prices = prices.sort_index().ffill().dropna(how="all")
