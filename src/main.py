@@ -183,7 +183,7 @@ def collect_tickers(assets_config: dict, strategies_config: dict) -> list[str]:
         ]:
             if config.get(key):
                 tickers.add(base_asset_name(config[key]))
-        for key in ["assets"]:
+        for key in ["assets", "candidate_assets", "defensive_assets"]:
             tickers.update(base_asset_name(asset) for asset in config.get(key, []))
         for key in ["leveraged_assets"]:
             tickers.update(base_asset_name(asset) for asset in (config.get(key) or {}).values())
@@ -209,7 +209,8 @@ def strategy_required_assets(config: dict) -> list[str]:
     ]:
         if config.get(key):
             assets.add(config[key])
-    assets.update(config.get("assets", []))
+    for key in ["assets", "candidate_assets", "defensive_assets"]:
+        assets.update(config.get(key, []))
     assets.update((config.get("leveraged_assets") or {}).values())
     for key in ["weights", "risk_on", "risk_off", "normal_weights", "bull_weights", "strong_bull_weights", "bear_weights"]:
         assets.update((config.get(key) or {}).keys())

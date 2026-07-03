@@ -233,6 +233,128 @@ class MomentumRotation2xStrategy(Strategy):
         return self.normalize({leveraged_assets.get(asset, asset): weight for asset in selected})
 
 
+class LeveragedMomentumRotation3xStrategy(Strategy):
+    def generate_weights(self, prices: pd.DataFrame, current_date: pd.Timestamp) -> dict[str, float]:
+        signal_asset = self.config.get("signal_asset", "QQQ")
+        ma_window = int(self.config.get("ma_window", 200))
+        lookback_months = int(self.config.get("lookback_months", 6))
+        top_n = int(self.config.get("top_n", 1))
+        candidate_assets = list(self.config.get("candidate_assets", ["QQQ_3X", "XLK_2X", "SMH_2X"]))
+        fallback_asset = self.config.get("fallback_asset", "SHY")
+
+        if not _above_ma(prices, signal_asset, current_date, ma_window):
+            return self.normalize({fallback_asset: 1.0})
+
+        selected = _top_momentum_assets(
+            prices,
+            current_date,
+            candidate_assets,
+            lookback_months=lookback_months,
+            top_n=top_n,
+            ma_window=ma_window,
+        )
+        if not selected:
+            return self.normalize({fallback_asset: 1.0})
+        weight = 1.0 / len(selected)
+        return self.normalize({asset: weight for asset in selected})
+
+
+class TqqqBullBearFullThrottleStrategy(Strategy):
+    def generate_weights(self, prices: pd.DataFrame, current_date: pd.Timestamp) -> dict[str, float]:
+        signal_asset = self.config.get("signal_asset", "QQQ")
+        fast_window = int(self.config.get("fast_window", 50))
+        slow_window = int(self.config.get("slow_window", 200))
+        slope_lookback = int(self.config.get("slope_lookback", 20))
+        risk_on_asset = self.config.get("risk_on_asset", "QQQ_3X")
+        risk_off_asset = self.config.get("risk_off_asset", "SHY")
+
+        price = _latest_price(prices, signal_asset, current_date)
+        fast_ma = moving_average_at(prices, signal_asset, current_date, fast_window)
+        slow_ma = moving_average_at(prices, signal_asset, current_date, slow_window)
+        slow_rising = _ma_slope_positive(prices, signal_asset, current_date, slow_window, slope_lookback)
+        if pd.notna(price) and pd.notna(fast_ma) and pd.notna(slow_ma) and price > slow_ma and fast_ma > slow_ma and slow_rising:
+            return self.normalize({risk_on_asset: 1.0})
+        return self.normalize({risk_off_asset: 1.0})
+
+
+class DailyTrend3xDrawdownBoostStrategy(Strategy):
+    def generate_weights(self, prices: pd.DataFrame, current_date: pd.Timestamp) -> dict[str, float]:
+        signal_asset = self.config.get("signal_asset", "QQQ")
+        fast_window = int(self.config.get("fast_window", 50))
+        slow_window = int(self.config.get("slow_window", 200))
+        slope_lookback = int(self.config.get("slope_lookback", 10))
+        soft_drawdown = float(self.config.get("soft_drawdown_threshold", 0.15))
+        deep_drawdown = float(self.config.get("deep_drawdown_threshold", 0.25))
+        asset_1x = self.config.get("asset_1x", "QQQ")
+        asset_2x = self.config.get("asset_2x", "QQQ_2X")
+        asset_3x = self.config.get("asset_3x", "QQQ_3X")
+        risk_off_asset = self.config.get("risk_off_asset", "SHY")
+
+        price = _latest_price(prices, signal_asset, current_date)
+        fast_ma = moving_average_at(prices, signal_asset, current_date, fast_window)
+        slow_ma = moving_average_at(prices, signal_asset, current_date, slow_window)
+        drawdown = historical_drawdown_at(prices, signal_asset, current_date)
+        fast_rising = _ma_slope_positive(prices, signal_asset, current_date, fast_window, slope_lookback)
+        if any(pd.isna(value) for value in [price, fast_ma, slow_ma, drawdown]):
+            return self.normalize({risk_off_asset: 1.0})
+
+        repaired_deep_drawdown = drawdown >= deep_drawdown and price > fast_ma and fast_rising
+        repaired_soft_drawdown = drawdown >= soft_drawdown and price > slow_ma
+        if repaired_deep_drawdown or repaired_soft_drawdown:
+            return self.normalize({asset_3x: 1.0})
+        if price > fast_ma and fast_ma > slow_ma:
+            return self.normalize({asset_3x: 1.0})
+        if price > slow_ma:
+            return self.normalize({asset_2x: 1.0})
+        if price > fast_ma:
+            return self.normalize({asset_1x: 1.0})
+        return self.normalize({risk_off_asset: 1.0})
+
+
+class TurboMomentum3xStrategy(Strategy):
+    def generate_weights(self, prices: pd.DataFrame, current_date: pd.Timestamp) -> dict[str, float]:
+        signal_asset = self.config.get("signal_asset", "QQQ")
+        fast_window = int(self.config.get("fast_window", 50))
+        slow_window = int(self.config.get("slow_window", 200))
+        slope_lookback = int(self.config.get("slope_lookback", 20))
+        vol_window = int(self.config.get("vol_window", 20))
+        max_vol = float(self.config.get("max_volatility", 0.45))
+        reentry_drawdown = float(self.config.get("reentry_drawdown_threshold", 0.20))
+        lookback_months = int(self.config.get("lookback_months", 6))
+        candidate_assets = list(self.config.get("candidate_assets", ["QQQ_3X", "XLK_2X", "SMH_2X", "QQQ_2X"]))
+        fallback_asset = self.config.get("fallback_asset", "SHY")
+        asset_2x = self.config.get("asset_2x", "QQQ_2X")
+
+        price = _latest_price(prices, signal_asset, current_date)
+        fast_ma = moving_average_at(prices, signal_asset, current_date, fast_window)
+        slow_ma = moving_average_at(prices, signal_asset, current_date, slow_window)
+        volatility = _realized_volatility(prices, signal_asset, current_date, vol_window)
+        drawdown = historical_drawdown_at(prices, signal_asset, current_date)
+        fast_rising = _ma_slope_positive(prices, signal_asset, current_date, fast_window, max(1, slope_lookback // 2))
+        slow_rising = _ma_slope_positive(prices, signal_asset, current_date, slow_window, slope_lookback)
+        if any(pd.isna(value) for value in [price, fast_ma, slow_ma, volatility, drawdown]):
+            return self.normalize({fallback_asset: 1.0})
+        if volatility > max_vol:
+            return self.normalize({fallback_asset: 1.0})
+
+        strong_trend = price > slow_ma and fast_ma > slow_ma and slow_rising
+        repaired_after_drawdown = drawdown >= reentry_drawdown and price > fast_ma and fast_rising
+        if strong_trend or repaired_after_drawdown:
+            selected = _top_momentum_assets(
+                prices,
+                current_date,
+                candidate_assets,
+                lookback_months=lookback_months,
+                top_n=1,
+                ma_window=slow_window,
+            )
+            if selected:
+                return self.normalize({selected[0]: 1.0})
+        if price > slow_ma:
+            return self.normalize({asset_2x: 1.0})
+        return self.normalize({fallback_asset: 1.0})
+
+
 class Breakout3xWithStopStrategy(Strategy):
     def generate_weights(self, prices: pd.DataFrame, current_date: pd.Timestamp) -> dict[str, float]:
         signal_asset = self.config.get("signal_asset", "QQQ")
@@ -362,6 +484,35 @@ def _latest_price(prices: pd.DataFrame, asset: str, current_date: pd.Timestamp) 
     if position < 0:
         return np.nan
     return float(history.iloc[position])
+
+
+def _top_momentum_assets(
+    prices: pd.DataFrame,
+    current_date: pd.Timestamp,
+    assets: list[str],
+    lookback_months: int,
+    top_n: int,
+    ma_window: int,
+) -> list[str]:
+    scores: dict[str, float] = {}
+    for asset in assets:
+        if asset not in prices.columns:
+            continue
+        trend_asset = _trend_asset_for(asset)
+        if trend_asset in prices.columns and not _above_ma(prices, trend_asset, current_date, ma_window):
+            continue
+        momentum = trailing_month_return(prices, asset, current_date, lookback_months)
+        if not np.isnan(momentum):
+            scores[asset] = float(momentum)
+    if not scores:
+        return []
+    return sorted(scores, key=scores.get, reverse=True)[: max(1, top_n)]
+
+
+def _trend_asset_for(asset: str) -> str:
+    if asset.endswith("_2X") or asset.endswith("_3X"):
+        return asset.rsplit("_", 1)[0]
+    return asset
 
 
 def _above_ma(prices: pd.DataFrame, asset: str, current_date: pd.Timestamp, window: int) -> bool:

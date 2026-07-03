@@ -30,6 +30,10 @@ STRATEGY_DESCRIPTIONS = {
     "dca_drawdown_boost": "月度定投策略，回撤越深，新投入资金越偏向 QQQ。",
     "daily_trend_2x": "每日趋势检查，牛市持有合成 2x QQQ，弱势切到防守资产。",
     "daily_trend_3x_defensive": "每日 50/200 日均线判断，强趋势用 3x，普通牛市用 2x，弱势防守。",
+    "daily_trend_3x_drawdown_boost": "高风险进攻策略：沿用 3x 趋势防守框架，并在大回撤修复阶段更快切回 3x。",
+    "tqqq_bull_bear_full_throttle": "高风险进攻策略：牛市结构明确时满仓 3x，趋势破坏时完全切到防守资产。",
+    "leveraged_momentum_rotation_3x": "高风险进攻策略：在 QQQ/科技/半导体杠杆资产中按动量选择最强标的，弱势切防守。",
+    "turbo_momentum_3x": "高风险研究策略：结合趋势、动量、波动和回撤修复信号，在杠杆科技资产中择强进攻。",
     "daily_trend_3x_defensive_v2_conservative": "3x 防守增强保守版：限制 3x 仓位，并用波动率和回撤刹车降低顶部风险。",
     "daily_trend_3x_defensive_v2_balanced": "3x 防守增强平衡版：保留强趋势进攻，同时加入波动率、均线斜率和回撤刹车。",
     "daily_trend_3x_defensive_v2_aggressive": "3x 防守增强进攻版：允许满仓 3x，但用波动率和回撤阈值控制极端风险。",
@@ -101,6 +105,7 @@ def _context_by_strategy(results: list[BacktestResult]) -> dict[str, dict[str, A
             "config": config,
             "mode": mode,
             "rebalanceFrequency": config.get("rebalance_frequency", "daily" if str(config.get("type", "")).startswith("daily") else "monthly"),
+            "highRisk": bool(config.get("high_risk", False)),
             "initialCapital": result.metadata.get("initial_capital"),
             "monthlyContribution": result.metadata.get("monthly_contribution"),
         }
@@ -132,7 +137,7 @@ def _month_end_sample(series: pd.Series) -> pd.Series:
     clean = series.dropna().sort_index()
     if clean.empty:
         return clean
-    sampled = clean.resample("ME").last().dropna()
+    sampled = clean.groupby(clean.index.to_period("M")).tail(1)
     if sampled.empty or sampled.index[0] != clean.index[0]:
         sampled = pd.concat([clean.iloc[[0]], sampled])
     if sampled.index[-1] != clean.index[-1]:
@@ -161,6 +166,7 @@ def _serialize_row(row: pd.Series, context: dict[str, Any]) -> dict[str, Any]:
             "Strategy Type": context.get("type") or _infer_strategy_type(name),
             "Mode": context.get("mode") or ("dca" if "dca" in name else "rebalanced"),
             "Rebalance Frequency": context.get("rebalanceFrequency") or _infer_frequency(name),
+            "High Risk": bool(context.get("highRisk")),
         }
     )
     return serialized
@@ -190,6 +196,8 @@ def _strategy_tags(name: str, assets: str, context: dict[str, Any]) -> list[str]
         tags.append("杠杆")
     else:
         tags.append("无杠杆")
+    if context.get("highRisk"):
+        tags.append("高风险")
 
     return list(dict.fromkeys(tags))
 
@@ -268,6 +276,37 @@ def _strategy_implementation(name: str, config: dict[str, Any]) -> str:
             f"每日比较 `{config.get('signal_asset', 'QQQ')}` 的 {config.get('fast_window', 50)} 日和 "
             f"{config.get('slow_window', 200)} 日均线；强趋势用 `{config.get('asset_3x', 'QQQ_3X')}`，"
             f"普通趋势用 `{config.get('asset_2x', 'QQQ_2X')}`，弱势用 `{config.get('risk_off_asset', 'SHY')}`。"
+        )
+    if strategy_type == "daily_trend_3x_drawdown_boost":
+        return (
+            f"每日先按 `{config.get('signal_asset', 'QQQ')}` 的 {config.get('fast_window', 50)} / "
+            f"{config.get('slow_window', 200)} 日均线做 3x/2x/1x/防守切换；当回撤超过 "
+            f"{_fmt_pct(config.get('soft_drawdown_threshold'))} 且价格重新站上长期趋势，或回撤超过 "
+            f"{_fmt_pct(config.get('deep_drawdown_threshold'))} 且重新站上短期趋势并转强时，直接使用 "
+            f"`{config.get('asset_3x', 'QQQ_3X')}` 追求修复反弹弹性。"
+        )
+    if strategy_type == "tqqq_bull_bear_full_throttle":
+        return (
+            f"每日要求 `{config.get('signal_asset', 'QQQ')}` 高于 {config.get('slow_window', 200)} 日均线，"
+            f"{config.get('fast_window', 50)} 日均线高于长期均线，且长期均线在 "
+            f"{config.get('slope_lookback', 20)} 日窗口内向上；满足时满仓 "
+            f"`{config.get('risk_on_asset', 'QQQ_3X')}`，否则切到 `{config.get('risk_off_asset', 'SHY')}`。"
+        )
+    if strategy_type == "leveraged_momentum_rotation_3x":
+        return (
+            f"先要求 `{config.get('signal_asset', 'QQQ')}` 高于 {config.get('ma_window', 200)} 日均线；"
+            f"通过后在候选池 {', '.join(config.get('candidate_assets', []))} 中按过去 "
+            f"{config.get('lookback_months', 6)} 个月动量排序，持有前 {config.get('top_n', 1)} 名；"
+            f"市场弱或无合格资产时持有 `{config.get('fallback_asset', 'SHY')}`。"
+        )
+    if strategy_type == "turbo_momentum_3x":
+        return (
+            f"每日检查 `{config.get('signal_asset', 'QQQ')}` 的 {config.get('fast_window', 50)} / "
+            f"{config.get('slow_window', 200)} 日趋势、{config.get('vol_window', 20)} 日波动率和回撤修复；"
+            f"波动率高于 {_fmt_pct(config.get('max_volatility'))} 时防守；强趋势或回撤超过 "
+            f"{_fmt_pct(config.get('reentry_drawdown_threshold'))} 后重新站上短期趋势时，"
+            f"在 {', '.join(config.get('candidate_assets', []))} 中选动量最强者；普通趋势只用 "
+            f"`{config.get('asset_2x', 'QQQ_2X')}`，弱势持有 `{config.get('fallback_asset', 'SHY')}`。"
         )
     if strategy_type == "daily_trend_3x_defensive_v2":
         return (
@@ -1036,6 +1075,12 @@ HTML_TEMPLATE = r"""<!doctype html>
       font-weight: 620;
     }
 
+    .bar-label.high-risk,
+    .point-label.high-risk {
+      fill: var(--red);
+      font-weight: 760;
+    }
+
     .bar-value {
       fill: var(--muted);
       font-size: 12px;
@@ -1064,6 +1109,12 @@ HTML_TEMPLATE = r"""<!doctype html>
       margin: 0 0 8px;
       font-size: 21px;
       overflow-wrap: anywhere;
+    }
+
+    .detail-name.high-risk,
+    .high-risk-text {
+      color: var(--red);
+      font-weight: 760;
     }
 
     .detail-text {
@@ -1096,6 +1147,13 @@ HTML_TEMPLATE = r"""<!doctype html>
       background: var(--surface-soft);
       color: var(--muted);
       font-size: 12px;
+    }
+
+    .tag.high-risk {
+      background: #fff1f0;
+      color: var(--red);
+      border: 1px solid rgba(180, 35, 24, 0.22);
+      font-weight: 760;
     }
 
     .mini-metrics {
@@ -1154,6 +1212,12 @@ HTML_TEMPLATE = r"""<!doctype html>
       font-weight: 760;
       overflow-wrap: anywhere;
       line-height: 1.35;
+    }
+
+    .method-item.high-risk .method-name,
+    .table-strategy-name.high-risk {
+      color: var(--red);
+      font-weight: 800;
     }
 
     .method-meta {
@@ -1914,6 +1978,14 @@ HTML_TEMPLATE = r"""<!doctype html>
       return allRows().find(row => row.Strategy === "qqq_buy_hold") || allRows()[0];
     }
 
+    function isHighRiskRow(row) {
+      return Boolean(row?.["High Risk"] || (row?.Tags || []).includes("高风险"));
+    }
+
+    function riskClass(row) {
+      return isHighRiskRow(row) ? "high-risk" : "";
+    }
+
     function fmtPct(value) {
       if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
       return `${(Number(value) * 100).toFixed(2)}%`;
@@ -2511,9 +2583,9 @@ HTML_TEMPLATE = r"""<!doctype html>
       const qqqDdDelta = benchmark ? selected["Max Drawdown"] - benchmark["Max Drawdown"] : null;
       host.innerHTML = `<div class="detail-layout">
         <div>
-          <h3 class="detail-name">${esc(selected.Strategy)}</h3>
+          <h3 class="detail-name ${riskClass(selected)}">${esc(selected.Strategy)}</h3>
           <p class="detail-text">${esc(selected.Description)}</p>
-          <div class="tag-row">${(selected.Tags || []).map(tag => `<span class="tag">${esc(tag)}</span>`).join("")}</div>
+          <div class="tag-row">${(selected.Tags || []).map(tag => `<span class="tag ${tag === "高风险" ? "high-risk" : ""}">${esc(tag)}</span>`).join("")}</div>
           <div class="implementation-box"><strong>实施规则：</strong>${esc(selected.Implementation)}</div>
         </div>
         <div class="mini-metrics">
@@ -2533,7 +2605,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         host.innerHTML = `<div class="empty-state">没有可展示的策略。调整左侧筛选条件试试。</div>`;
         return;
       }
-      host.innerHTML = rows.map(row => `<button class="method-item ${row.Strategy === state.selected ? "selected" : ""}" type="button" data-strategy="${esc(row.Strategy)}">
+      host.innerHTML = rows.map(row => `<button class="method-item ${row.Strategy === state.selected ? "selected" : ""} ${riskClass(row)}" type="button" data-strategy="${esc(row.Strategy)}">
         <div>
           <div class="method-name">${esc(row.Strategy)}</div>
           <div class="method-meta">${esc(row["Rebalance Frequency"] || "monthly")} · ${esc((row.Tags || []).join(" / "))}</div>
@@ -2557,12 +2629,13 @@ HTML_TEMPLATE = r"""<!doctype html>
       const strategies = rows
         .map(row => row.Strategy)
         .filter(strategy => (seriesByStrategy[strategy] || []).length);
+      const rowByStrategy = new Map(rows.map(row => [row.Strategy, row]));
 
       const visibleCount = strategies.filter(strategy => !state.hiddenSeries[strategy]).length;
       legendHost.innerHTML = strategies.length
         ? `<div class="legend-count">${visibleCount} / ${strategies.length} 条曲线显示</div>` + strategies.map(strategy => {
             const hidden = Boolean(state.hiddenSeries[strategy]);
-            return `<button class="legend-item ${hidden ? "off" : ""}" type="button" aria-pressed="${hidden ? "false" : "true"}" data-line-strategy="${esc(strategy)}">
+            return `<button class="legend-item ${hidden ? "off" : ""} ${riskClass(rowByStrategy.get(strategy))}" type="button" aria-pressed="${hidden ? "false" : "true"}" data-line-strategy="${esc(strategy)}">
               <span class="legend-swatch" style="background:${colorForStrategy(strategy)}"></span>
               <span>${esc(strategy)}</span>
             </button>`;
@@ -2707,7 +2780,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         const color = value >= 0 ? "var(--accent)" : "var(--red)";
         const selectedClass = row.Strategy === state.selected ? `stroke="var(--ink)" stroke-width="2"` : "";
         return `<g role="button" tabindex="0" data-strategy="${esc(row.Strategy)}">
-          <text class="bar-label" x="10" y="${y + 20}">${esc(row.Strategy)}</text>
+          <text class="bar-label ${riskClass(row)}" x="10" y="${y + 20}">${esc(row.Strategy)}</text>
           <rect x="${x}" y="${y + 7}" width="${barW}" height="18" rx="5" fill="${color}" ${selectedClass}></rect>
           <text class="bar-value" x="${Math.max(xValue, axisX) + 8}" y="${y + 21}">${esc(fmtMetric(value, type))}</text>
         </g>`;
@@ -2750,7 +2823,7 @@ HTML_TEMPLATE = r"""<!doctype html>
           <circle cx="${xScale(Number(row.Volatility ?? 0))}" cy="${yScale(Number(row.CAGR ?? 0))}" r="${selected ? radius + 2 : radius}" fill="${color}" opacity="${selected ? 0.96 : 0.72}" stroke="${selected ? "var(--ink)" : "white"}" stroke-width="${selected ? 2 : 1.5}">
             <title>${esc(row.Strategy)} · 年化 ${fmtPct(row.CAGR)} · 波动 ${fmtPct(row.Volatility)} · 回撤 ${fmtPct(row["Max Drawdown"])}</title>
           </circle>
-          ${selected ? `<text class="point-label" x="${xScale(Number(row.Volatility ?? 0)) + 12}" y="${yScale(Number(row.CAGR ?? 0)) - 10}">${esc(row.Strategy)}</text>` : ""}
+          ${selected ? `<text class="point-label ${riskClass(row)}" x="${xScale(Number(row.Volatility ?? 0)) + 12}" y="${yScale(Number(row.CAGR ?? 0)) - 10}">${esc(row.Strategy)}</text>` : ""}
         </g>`;
       }).join("");
       host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="风险收益散点图">
@@ -2793,7 +2866,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         ${periods.map(period => `<div class="heat-cell heat-head">${period.replace(" CAGR", "")}</div>`).join("")}
       </div>`;
       const body = rows.map(row => `<div class="heat-row">
-        <button class="heat-cell heat-name" type="button" data-strategy="${esc(row.Strategy)}">${esc(row.Strategy)}</button>
+        <button class="heat-cell heat-name ${riskClass(row)}" type="button" data-strategy="${esc(row.Strategy)}">${esc(row.Strategy)}</button>
         ${periods.map(period => `<div class="heat-cell" style="background:${colorFor(row[period])}">${fmtPct(row[period])}</div>`).join("")}
       </div>`).join("");
       host.innerHTML = header + body;
@@ -2817,7 +2890,7 @@ HTML_TEMPLATE = r"""<!doctype html>
           const value = fmtMetric(raw, type);
           const tone = key.includes("CAGR") || key === "Total Return" ? (Number(raw) >= 0 ? "good" : "bad") : key.includes("Drawdown") || key.includes("MaxDD") ? (Number(raw) > -0.5 ? "good" : "bad") : "";
           if (colIndex === 0) {
-            return `<td><span class="rank-badge ${index < 3 ? "top" : ""}">${index + 1}</span><span class="strategy-name table-strategy-name" tabindex="0" data-strategy-tooltip="${esc(row.Strategy)}">${esc(value)}</span></td>`;
+            return `<td><span class="rank-badge ${index < 3 ? "top" : ""}">${index + 1}</span><span class="strategy-name table-strategy-name ${riskClass(row)}" tabindex="0" data-strategy-tooltip="${esc(row.Strategy)}">${esc(value)}</span></td>`;
           }
           return `<td class="number ${tone}">${esc(value)}</td>`;
         }).join("")}
@@ -2850,9 +2923,9 @@ HTML_TEMPLATE = r"""<!doctype html>
     }
 
     function tooltipHtml(row) {
-      return `<div class="tooltip-title">${esc(row.Strategy)}</div>
+      return `<div class="tooltip-title ${riskClass(row)}">${esc(row.Strategy)}</div>
         <div class="tooltip-meta">
-          ${(row.Tags || []).map(tag => `<span class="tooltip-pill">${esc(tag)}</span>`).join("")}
+          ${(row.Tags || []).map(tag => `<span class="tooltip-pill ${tag === "高风险" ? "high-risk" : ""}">${esc(tag)}</span>`).join("")}
           <span class="tooltip-pill">${esc(row["Rebalance Frequency"] || "monthly")}</span>
           <span class="tooltip-pill">${esc(row["Required Assets"] || "N/A")}</span>
         </div>
@@ -3449,6 +3522,11 @@ CHART_PAGE_TEMPLATE = r"""<!doctype html>
       background: #f1f4f3;
     }
 
+    .legend-item.high-risk {
+      color: var(--red);
+      font-weight: 760;
+    }
+
     .legend-swatch {
       width: 18px;
       height: 3px;
@@ -3506,6 +3584,12 @@ CHART_PAGE_TEMPLATE = r"""<!doctype html>
       font-weight: 650;
     }
 
+    .bar-label.high-risk,
+    .point-label.high-risk {
+      fill: var(--red);
+      font-weight: 780;
+    }
+
     .bar-value {
       fill: var(--muted);
       font-size: 12px;
@@ -3554,6 +3638,11 @@ CHART_PAGE_TEMPLATE = r"""<!doctype html>
       background: #f1f5f4;
       color: var(--ink);
       overflow-wrap: anywhere;
+    }
+
+    .heat-name.high-risk {
+      color: var(--red);
+      font-weight: 800;
     }
 
     .heat-head {
@@ -3906,6 +3995,14 @@ CHART_PAGE_TEMPLATE = r"""<!doctype html>
 
     function benchmarkRow() {
       return allRows().find(row => row.Strategy === "qqq_buy_hold") || allRows()[0];
+    }
+
+    function isHighRiskRow(row) {
+      return Boolean(row?.["High Risk"] || (row?.Tags || []).includes("高风险"));
+    }
+
+    function riskClass(row) {
+      return isHighRiskRow(row) ? "high-risk" : "";
     }
 
     function colorForStrategy(strategyName) {
@@ -4412,6 +4509,7 @@ CHART_PAGE_TEMPLATE = r"""<!doctype html>
         .filter(strategy => (seriesByStrategy[strategy] || []).length);
       const selectedSet = new Set(selectedRows.map(row => row.Strategy));
       const strategies = candidateStrategies.filter(strategy => selectedSet.has(strategy));
+      const rowByStrategy = new Map(candidateRows.map(row => [row.Strategy, row]));
 
       legendCount.innerHTML = candidateStrategies.length
         ? `${strategies.length} / ${candidateStrategies.length} 条候选曲线已入图
@@ -4422,7 +4520,7 @@ CHART_PAGE_TEMPLATE = r"""<!doctype html>
         : "当前筛选没有可绘制曲线";
       legendHost.innerHTML = candidateStrategies.map(strategy => {
         const isSelected = isStrategySelected(strategy);
-        return `<button class="legend-item ${isSelected ? "on" : "off"}" type="button" aria-pressed="${isSelected ? "true" : "false"}" data-line-strategy="${esc(strategy)}">
+        return `<button class="legend-item ${isSelected ? "on" : "off"} ${riskClass(rowByStrategy.get(strategy))}" type="button" aria-pressed="${isSelected ? "true" : "false"}" data-line-strategy="${esc(strategy)}">
           <span class="legend-box" aria-hidden="true"></span>
           <span class="legend-swatch" style="background:${colorForStrategy(strategy)}"></span>
           <span>${esc(strategy)}</span>
@@ -4569,7 +4667,7 @@ CHART_PAGE_TEMPLATE = r"""<!doctype html>
         const color = value >= 0 ? "var(--accent)" : "var(--red)";
         const selectedClass = row.Strategy === state.selected ? `stroke="var(--ink)" stroke-width="2"` : "";
         return `<g role="button" tabindex="0" data-strategy="${esc(row.Strategy)}">
-          <text class="bar-label" x="14" y="${y + 23}">${esc(row.Strategy)}</text>
+          <text class="bar-label ${riskClass(row)}" x="14" y="${y + 23}">${esc(row.Strategy)}</text>
           <rect x="${x}" y="${y + 8}" width="${barW}" height="21" rx="6" fill="${color}" ${selectedClass}></rect>
           <text class="bar-value" x="${Math.max(xValue, axisX) + 10}" y="${y + 24}">${esc(fmtMetric(value, type))}</text>
         </g>`;
@@ -4618,7 +4716,7 @@ CHART_PAGE_TEMPLATE = r"""<!doctype html>
           <circle cx="${xScale(Number(row.Volatility ?? 0))}" cy="${yScale(Number(row.CAGR ?? 0))}" r="${selected ? radius + 2 : radius}" fill="${color}" opacity="${selected ? 0.96 : 0.72}" stroke="${selected ? "var(--ink)" : "white"}" stroke-width="${selected ? 2 : 1.5}">
             <title>${esc(row.Strategy)} · 年化 ${fmtPct(row.CAGR)} · 波动 ${fmtPct(row.Volatility)} · 回撤 ${fmtPct(row["Max Drawdown"])}</title>
           </circle>
-          ${selected ? `<text class="point-label" x="${xScale(Number(row.Volatility ?? 0)) + 14}" y="${yScale(Number(row.CAGR ?? 0)) - 12}">${esc(row.Strategy)}</text>` : ""}
+          ${selected ? `<text class="point-label ${riskClass(row)}" x="${xScale(Number(row.Volatility ?? 0)) + 14}" y="${yScale(Number(row.CAGR ?? 0)) - 12}">${esc(row.Strategy)}</text>` : ""}
         </g>`;
       }).join("");
       host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="风险收益散点图">
@@ -4658,7 +4756,7 @@ CHART_PAGE_TEMPLATE = r"""<!doctype html>
         ${periods.map(period => `<div class="heat-cell heat-head">${period.replace(" CAGR", "")}</div>`).join("")}
       </div>`;
       const body = rows.map(row => `<div class="heat-row">
-        <button class="heat-cell heat-name" type="button" data-strategy="${esc(row.Strategy)}">${esc(row.Strategy)}</button>
+        <button class="heat-cell heat-name ${riskClass(row)}" type="button" data-strategy="${esc(row.Strategy)}">${esc(row.Strategy)}</button>
         ${periods.map(period => `<div class="heat-cell" style="background:${colorFor(row[period])}">${fmtPct(row[period])}</div>`).join("")}
       </div>`).join("");
       host.innerHTML = header + body;

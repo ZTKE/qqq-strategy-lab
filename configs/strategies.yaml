@@ -128,6 +128,68 @@ daily_trend_3x_defensive:
   asset_3x: QQQ_3X
   risk_off_asset: SHY
 
+daily_trend_3x_drawdown_boost:
+  type: daily_trend_3x_drawdown_boost
+  high_risk: true
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  fast_window: 50
+  slow_window: 200
+  slope_lookback: 10
+  soft_drawdown_threshold: 0.15
+  deep_drawdown_threshold: 0.25
+  asset_1x: QQQ
+  asset_2x: QQQ_2X
+  asset_3x: QQQ_3X
+  risk_off_asset: SHY
+
+# Disabled: high-risk experiments that did not add enough value versus simpler TQQQ trend rules.
+# tqqq_bull_bear_full_throttle:
+#   type: tqqq_bull_bear_full_throttle
+#   high_risk: true
+#   rebalance_frequency: daily
+#   signal_asset: QQQ
+#   fast_window: 50
+#   slow_window: 200
+#   slope_lookback: 20
+#   risk_on_asset: QQQ_3X
+#   risk_off_asset: SHY
+#
+# leveraged_momentum_rotation_3x:
+#   type: leveraged_momentum_rotation_3x
+#   high_risk: true
+#   rebalance_frequency: daily
+#   signal_asset: QQQ
+#   ma_window: 200
+#   lookback_months: 6
+#   top_n: 1
+#   candidate_assets:
+#     - QQQ_3X
+#     - QQQ_2X
+#     - XLK_2X
+#     - SMH_2X
+#   fallback_asset: SHY
+
+turbo_momentum_3x:
+  type: turbo_momentum_3x
+  high_risk: true
+  rebalance_frequency: daily
+  signal_asset: QQQ
+  fast_window: 50
+  slow_window: 200
+  slope_lookback: 20
+  vol_window: 20
+  max_volatility: 0.45
+  reentry_drawdown_threshold: 0.20
+  lookback_months: 6
+  candidate_assets:
+    - QQQ_3X
+    - QQQ_2X
+    - XLK_2X
+    - SMH_2X
+  asset_2x: QQQ_2X
+  fallback_asset: SHY
+
 # Disabled as parameter-sweep variants of daily_trend_3x_defensive / vol_target_trend.
 # daily_trend_3x_defensive_v2_conservative:
 #   type: daily_trend_3x_defensive_v2

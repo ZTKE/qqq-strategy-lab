@@ -45,9 +45,21 @@ class DataLoader:
         cache_path = self.raw_dir / f"{ticker}.csv"
         if cache_path.exists() and not force_refresh:
             cached = self._read_cache(cache_path, ticker)
-            cached = self._filter_date_range(cached, start, end)
-            if not cached.empty:
-                return cached
+            if self._cache_covers_requested_end(cached, end):
+                filtered = self._filter_date_range(cached, start, end)
+                if not filtered.empty:
+                    return filtered
+
+            try:
+                updated = self._update_cache(ticker, cached, cache_path, end)
+                filtered = self._filter_date_range(updated, start, end)
+                if not filtered.empty:
+                    return filtered
+            except Exception:
+                filtered = self._filter_date_range(cached, start, end)
+                if not filtered.empty:
+                    print(f"Warning: yfinance update failed for {ticker}; using cached CSV through {cached.index.max().date()}.")
+                    return filtered
 
         try:
             downloaded = self._download(ticker, start, end)
@@ -61,6 +73,32 @@ class DataLoader:
                     print(f"Warning: yfinance failed for {ticker}; using cached CSV.")
                     return cached
             raise
+
+    def _cache_covers_requested_end(self, cached: pd.Series, end: str | None) -> bool:
+        if cached.empty:
+            return False
+        if end is None:
+            return False
+        return cached.index.max() >= pd.Timestamp(end)
+
+    def _update_cache(self, ticker: str, cached: pd.Series, cache_path: Path, end: str | None) -> pd.Series:
+        if cached.empty:
+            downloaded = self._download(ticker, "1970-01-01", end)
+            downloaded.to_frame("Close").to_csv(cache_path, index_label="Date")
+            return downloaded
+
+        old_last_date = cached.index.max()
+        # Use a short overlap so late adjustments, holidays, or partial prior downloads are corrected.
+        update_start = (old_last_date - pd.Timedelta(days=7)).date().isoformat()
+        downloaded = self._download(ticker, update_start, end)
+        combined = pd.concat([cached, downloaded]).sort_index()
+        combined = combined[~combined.index.duplicated(keep="last")]
+        combined.name = ticker
+        combined.to_frame("Close").to_csv(cache_path, index_label="Date")
+        new_last_date = combined.index.max()
+        if new_last_date > old_last_date:
+            print(f"Updated {ticker}: {old_last_date.date()} -> {new_last_date.date()}")
+        return combined
 
     def _read_cache(self, cache_path: Path, ticker: str) -> pd.Series:
         data = pd.read_csv(cache_path, parse_dates=["Date"], index_col="Date")
